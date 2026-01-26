@@ -2,6 +2,9 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import Layout from './components/Layout'
+import { PageLoader } from './components/ui/Loader'
+
+// Pages
 import Home from './pages/Home'
 import Collection from './pages/Collection'
 import Scan from './pages/Scan'
@@ -9,17 +12,16 @@ import Profile from './pages/Profile'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import ArtworkDetail from './pages/ArtworkDetail'
+import Museums from './pages/Museums'
+import MuseumDetail from './pages/MuseumDetail'
+import News from './pages/News'
 
 // Protected Route wrapper
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-primary">Chargement...</div>
-      </div>
-    )
+    return <PageLoader message="Chargement..." />
   }
 
   if (!user) {
@@ -49,6 +51,9 @@ function App() {
             <Route path="scan" element={<Scan />} />
             <Route path="profile" element={<Profile />} />
             <Route path="artwork/:id" element={<ArtworkDetail />} />
+            <Route path="museums" element={<Museums />} />
+            <Route path="museum/:id" element={<MuseumDetail />} />
+            <Route path="news" element={<News />} />
           </Route>
         </Routes>
       </AuthProvider>

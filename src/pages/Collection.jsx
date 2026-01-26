@@ -2,31 +2,56 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { useTheme } from '../contexts/ThemeContext'
+import { ArtworkCard } from '../components/ui/Card'
+import { SkeletonCard } from '../components/ui/Loader'
+import EmptyState from '../components/ui/EmptyState'
+import { Drawer } from '../components/ui/Modal'
+import { ChipGroup } from '../components/ui/Chip'
 
-const TABS = [
-  { id: 'all', label: 'ALL WORKS' },
-  { id: 'painting', label: 'PAINTINGS' },
-  { id: 'sculpture', label: 'SCULPTURES' },
-  { id: 'photography', label: 'PHOTOGRAPHY' }
+// Filter options
+const PERIODS = [
+  { value: 'renaissance', label: 'Renaissance' },
+  { value: 'baroque', label: 'Baroque' },
+  { value: 'romanticism', label: 'Romantisme' },
+  { value: 'impressionism', label: 'Impressionnisme' },
+  { value: 'modern', label: 'Art Moderne' },
+  { value: 'contemporary', label: 'Contemporain' },
+]
+
+const TYPES = [
+  { value: 'painting', label: 'Peinture' },
+  { value: 'sculpture', label: 'Sculpture' },
+  { value: 'photography', label: 'Photographie' },
+  { value: 'drawing', label: 'Dessin' },
+  { value: 'print', label: 'Gravure' },
 ]
 
 const SORT_OPTIONS = [
-  { value: 'recent', label: 'Recent' },
-  { value: 'oldest', label: 'Oldest' },
-  { value: 'title', label: 'Title A-Z' },
-  { value: 'artist', label: 'Artist A-Z' }
+  { value: 'recent', label: 'Date d\'ajout (récent)' },
+  { value: 'oldest', label: 'Date d\'ajout (ancien)' },
+  { value: 'title', label: 'Titre A-Z' },
+  { value: 'artist', label: 'Artiste A-Z' },
+  { value: 'year', label: 'Année' },
 ]
 
 export default function Collection() {
-  const { user, profile } = useAuth()
-  const { theme, toggleTheme } = useTheme()
+  const { user } = useAuth()
   const [artworks, setArtworks] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('all')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState('recent')
+
+  // View states
+  const [viewMode, setViewMode] = useState('grid') // grid, list
   const [showSearch, setShowSearch] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedPeriods, setSelectedPeriods] = useState([])
+  const [selectedTypes, setSelectedTypes] = useState([])
+  const [selectedMuseum, setSelectedMuseum] = useState('')
+  const [selectedArtist, setSelectedArtist] = useState('')
+  const [sortBy, setSortBy] = useState('recent')
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
 
   useEffect(() => {
     fetchArtworks()
@@ -47,31 +72,67 @@ export default function Collection() {
     setLoading(false)
   }
 
+  // Get unique museums and artists for filter dropdowns
+  const museums = useMemo(() => {
+    const unique = [...new Set(artworks.filter(a => a.museum).map(a => a.museum))]
+    return unique.sort()
+  }, [artworks])
+
+  const artists = useMemo(() => {
+    const unique = [...new Set(artworks.filter(a => a.artist).map(a => a.artist))]
+    return unique.sort()
+  }, [artworks])
+
   // Filter and sort artworks
   const filteredArtworks = useMemo(() => {
     let result = artworks.filter(artwork => {
       // Search query
-      const matchesSearch = !searchQuery ||
-        artwork.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        artwork.artist?.toLowerCase().includes(searchQuery.toLowerCase())
-
-      // Tab filter (by medium type)
-      let matchesTab = true
-      if (activeTab === 'painting') {
-        matchesTab = artwork.medium?.toLowerCase().includes('oil') ||
-          artwork.medium?.toLowerCase().includes('paint') ||
-          artwork.medium?.toLowerCase().includes('canvas') ||
-          artwork.medium?.toLowerCase().includes('huile')
-      } else if (activeTab === 'sculpture') {
-        matchesTab = artwork.medium?.toLowerCase().includes('sculpt') ||
-          artwork.medium?.toLowerCase().includes('bronze') ||
-          artwork.medium?.toLowerCase().includes('marble')
-      } else if (activeTab === 'photography') {
-        matchesTab = artwork.medium?.toLowerCase().includes('photo') ||
-          artwork.medium?.toLowerCase().includes('print')
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        const matchesSearch =
+          artwork.title?.toLowerCase().includes(query) ||
+          artwork.artist?.toLowerCase().includes(query) ||
+          artwork.museum?.toLowerCase().includes(query)
+        if (!matchesSearch) return false
       }
 
-      return matchesSearch && matchesTab
+      // Period filter
+      if (selectedPeriods.length > 0) {
+        const period = artwork.period?.toLowerCase() || ''
+        const matchesPeriod = selectedPeriods.some(p => period.includes(p))
+        if (!matchesPeriod) return false
+      }
+
+      // Type filter (by medium)
+      if (selectedTypes.length > 0) {
+        const medium = artwork.medium?.toLowerCase() || ''
+        const matchesType = selectedTypes.some(t => {
+          if (t === 'painting') return medium.includes('oil') || medium.includes('huile') || medium.includes('canvas') || medium.includes('toile')
+          if (t === 'sculpture') return medium.includes('sculpt') || medium.includes('bronze') || medium.includes('marble')
+          if (t === 'photography') return medium.includes('photo') || medium.includes('print')
+          if (t === 'drawing') return medium.includes('draw') || medium.includes('dessin') || medium.includes('pencil')
+          if (t === 'print') return medium.includes('gravure') || medium.includes('litho') || medium.includes('etching')
+          return false
+        })
+        if (!matchesType) return false
+      }
+
+      // Museum filter
+      if (selectedMuseum && artwork.museum !== selectedMuseum) {
+        return false
+      }
+
+      // Artist filter
+      if (selectedArtist && artwork.artist !== selectedArtist) {
+        return false
+      }
+
+      // Favorites filter
+      if (favoritesOnly && !artwork.is_favorite) {
+        return false
+      }
+
+      return true
     })
 
     // Sort
@@ -85,118 +146,285 @@ export default function Collection() {
       case 'artist':
         result = [...result].sort((a, b) => (a.artist || '').localeCompare(b.artist || ''))
         break
+      case 'year':
+        result = [...result].sort((a, b) => (parseInt(a.year) || 0) - (parseInt(b.year) || 0))
+        break
+      default: // recent
+        result = [...result].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     }
 
     return result
-  }, [artworks, searchQuery, activeTab, sortBy])
+  }, [artworks, searchQuery, selectedPeriods, selectedTypes, selectedMuseum, selectedArtist, sortBy, favoritesOnly])
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-primary font-display italic text-xl">Loading collection...</div>
-      </div>
-    )
+  // Count active filters
+  const activeFilterCount = selectedPeriods.length + selectedTypes.length +
+    (selectedMuseum ? 1 : 0) + (selectedArtist ? 1 : 0) + (favoritesOnly ? 1 : 0)
+
+  // Reset filters
+  function resetFilters() {
+    setSelectedPeriods([])
+    setSelectedTypes([])
+    setSelectedMuseum('')
+    setSelectedArtist('')
+    setFavoritesOnly(false)
+    setSortBy('recent')
   }
 
   return (
     <div className="min-h-screen pb-24">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-bg-light/80 dark:bg-bg-dark/80 backdrop-blur-xl border-b border-black/5 dark:border-white/5">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            {/* Logo */}
-            <Link to="/" className="font-display text-2xl font-bold italic text-primary">
-              ArtVault
-            </Link>
-
-            {/* Right actions */}
-            <div className="flex items-center gap-3">
-              {/* Search toggle */}
-              <button
-                onClick={() => setShowSearch(!showSearch)}
-                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-              >
-                <span className="material-symbols-outlined">search</span>
-              </button>
-
-              {/* Theme toggle */}
-              <button
-                onClick={toggleTheme}
-                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-              >
-                <span className="material-symbols-outlined">
-                  {theme === 'dark' ? 'light_mode' : 'dark_mode'}
-                </span>
-              </button>
-
-              {/* Profile */}
-              <Link
-                to="/profile"
-                className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold"
-              >
-                {profile?.full_name?.[0]?.toUpperCase() || 'U'}
-              </Link>
-            </div>
+      <header className="px-4 py-8 md:py-12 max-w-7xl mx-auto">
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h1 className="font-display text-3xl md:text-4xl italic mb-2">
+              Ma Collection
+            </h1>
+            <p className="text-secondary">
+              {artworks.length} œuvre{artworks.length > 1 ? 's' : ''}
+            </p>
           </div>
 
-          {/* Search bar (collapsible) */}
-          {showSearch && (
-            <div className="mt-4 relative">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-black/40 dark:text-white/40">
-                search
+          {/* Header actions */}
+          <div className="flex items-center gap-2">
+            {/* Search toggle */}
+            <button
+              onClick={() => setShowSearch(!showSearch)}
+              className={`btn btn-ghost btn-icon ${showSearch ? 'text-accent' : ''}`}
+            >
+              <span className="material-symbols-outlined">search</span>
+            </button>
+
+            {/* Filter button */}
+            <button
+              onClick={() => setShowFilters(true)}
+              className="btn btn-ghost btn-icon relative"
+            >
+              <span className="material-symbols-outlined">tune</span>
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-accent text-xs font-medium text-bg-dark rounded-full flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+
+            {/* View toggle */}
+            <button
+              onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+              className="btn btn-ghost btn-icon"
+            >
+              <span className="material-symbols-outlined">
+                {viewMode === 'grid' ? 'view_list' : 'grid_view'}
               </span>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by title or artist..."
-                className="input-field pl-12"
-                autoFocus
-              />
-            </div>
-          )}
+            </button>
+          </div>
         </div>
+
+        {/* Search bar */}
+        {showSearch && (
+          <div className="relative animate-slide-up">
+            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-secondary">
+              search
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher par titre, artiste ou musée..."
+              className="input pl-12"
+              autoFocus
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2"
+              >
+                <span className="material-symbols-outlined text-secondary">close</span>
+              </button>
+            )}
+          </div>
+        )}
       </header>
 
-      {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-4 py-12 text-center">
-        <p className="text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-4">
-          Private Collection
-        </p>
-        <h1 className="font-display text-5xl md:text-6xl lg:text-7xl font-bold italic mb-4">
-          The Private Collection
-        </h1>
-        <p className="text-lg text-black/60 dark:text-white/60 max-w-2xl mx-auto font-body">
-          A curated selection of {artworks.length} masterpieces, spanning centuries of artistic expression
-          and human creativity.
-        </p>
-      </section>
-
-      {/* Tabs & Controls */}
-      <section className="max-w-7xl mx-auto px-4 mb-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-black/10 dark:border-white/10">
-          {/* Tabs */}
-          <div className="flex gap-1 overflow-x-auto no-scrollbar -mb-px">
-            {TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`tab whitespace-nowrap ${activeTab === tab.id ? 'active' : ''}`}
-              >
-                {tab.label}
-              </button>
+      {/* Content */}
+      <div className="px-4 max-w-7xl mx-auto">
+        {loading ? (
+          // Loading skeleton
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <SkeletonCard key={i} />
             ))}
           </div>
+        ) : filteredArtworks.length === 0 ? (
+          // Empty state
+          artworks.length === 0 ? (
+            <EmptyState
+              icon="collections"
+              title="Votre collection est vide"
+              description="Scannez votre première œuvre pour commencer à constituer votre galerie personnelle"
+              action="Scanner une œuvre"
+              actionLink="/scan"
+            />
+          ) : (
+            <EmptyState
+              icon="search_off"
+              title="Aucun résultat"
+              description="Aucune œuvre ne correspond à vos critères de recherche"
+              action="Réinitialiser les filtres"
+              onAction={resetFilters}
+            />
+          )
+        ) : (
+          // Artworks grid
+          <div className={viewMode === 'grid'
+            ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6'
+            : 'space-y-4'
+          }>
+            {filteredArtworks.map((artwork) => (
+              viewMode === 'grid' ? (
+                <ArtworkCard key={artwork.id} artwork={artwork} />
+              ) : (
+                // List view
+                <Link
+                  key={artwork.id}
+                  to={`/artwork/${artwork.id}`}
+                  className="card flex gap-4 p-4"
+                >
+                  <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-secondary">
+                    {artwork.image_url ? (
+                      <img
+                        src={artwork.image_url}
+                        alt={artwork.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="material-symbols-outlined text-secondary">image</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-display italic truncate">{artwork.title}</h3>
+                    <p className="text-secondary text-sm truncate">{artwork.artist}</p>
+                    <p className="text-secondary text-xs mt-1">{artwork.year}</p>
+                  </div>
+                  {artwork.is_favorite && (
+                    <span className="material-symbols-outlined filled text-accent self-center">
+                      favorite
+                    </span>
+                  )}
+                </Link>
+              )
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Floating Add Button */}
+      <Link
+        to="/scan"
+        className="fixed bottom-24 right-4 md:bottom-8 md:right-8 w-14 h-14 bg-accent rounded-full shadow-lg flex items-center justify-center text-bg-dark hover:bg-accent-hover transition-all z-30"
+      >
+        <span className="material-symbols-outlined text-2xl">add</span>
+      </Link>
+
+      {/* Filters Drawer */}
+      <Drawer
+        isOpen={showFilters}
+        onClose={() => setShowFilters(false)}
+        title="Filtres"
+      >
+        <div className="space-y-6">
+          {/* Results count */}
+          <p className="text-secondary">
+            {filteredArtworks.length} résultat{filteredArtworks.length > 1 ? 's' : ''}
+          </p>
+
+          {/* Favorites toggle */}
+          <div className="flex items-center justify-between">
+            <span className="font-medium">Favoris uniquement</span>
+            <button
+              onClick={() => setFavoritesOnly(!favoritesOnly)}
+              className={`w-12 h-7 rounded-full transition-colors ${
+                favoritesOnly ? 'bg-accent' : 'bg-secondary'
+              }`}
+            >
+              <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                favoritesOnly ? 'translate-x-6' : 'translate-x-1'
+              }`} />
+            </button>
+          </div>
+
+          <div className="divider" />
+
+          {/* Period filter */}
+          <div>
+            <h3 className="label mb-3">Période</h3>
+            <ChipGroup
+              options={PERIODS}
+              selected={selectedPeriods}
+              onChange={setSelectedPeriods}
+              multiple
+            />
+          </div>
+
+          <div className="divider" />
+
+          {/* Type filter */}
+          <div>
+            <h3 className="label mb-3">Type</h3>
+            <ChipGroup
+              options={TYPES}
+              selected={selectedTypes}
+              onChange={setSelectedTypes}
+              multiple
+            />
+          </div>
+
+          <div className="divider" />
+
+          {/* Museum filter */}
+          {museums.length > 0 && (
+            <div>
+              <h3 className="label mb-3">Musée</h3>
+              <select
+                value={selectedMuseum}
+                onChange={(e) => setSelectedMuseum(e.target.value)}
+                className="input"
+              >
+                <option value="">Tous les musées</option>
+                {museums.map(museum => (
+                  <option key={museum} value={museum}>{museum}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Artist filter */}
+          {artists.length > 0 && (
+            <div>
+              <h3 className="label mb-3">Artiste</h3>
+              <select
+                value={selectedArtist}
+                onChange={(e) => setSelectedArtist(e.target.value)}
+                className="input"
+              >
+                <option value="">Tous les artistes</option>
+                {artists.map(artist => (
+                  <option key={artist} value={artist}>{artist}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="divider" />
 
           {/* Sort */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs uppercase tracking-widest text-black/40 dark:text-white/40">
-              Sort by
-            </span>
+          <div>
+            <h3 className="label mb-3">Trier par</h3>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="appearance-none bg-transparent text-sm font-medium cursor-pointer focus:outline-none"
+              className="input"
             >
               {SORT_OPTIONS.map(option => (
                 <option key={option.value} value={option.value}>
@@ -205,80 +433,24 @@ export default function Collection() {
               ))}
             </select>
           </div>
-        </div>
-      </section>
 
-      {/* Artworks Grid */}
-      <section className="max-w-7xl mx-auto px-4">
-        {filteredArtworks.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-black/40 dark:text-white/40 text-lg mb-6">
-              {searchQuery ? 'No artworks match your search' : 'Your collection is empty'}
-            </p>
-            <Link
-              to="/scan"
-              className="btn-primary inline-flex items-center gap-2"
+          {/* Actions */}
+          <div className="flex gap-3 pt-4">
+            <button
+              onClick={resetFilters}
+              className="btn btn-outline flex-1"
             >
-              <span className="material-symbols-outlined">add</span>
-              Add your first artwork
-            </Link>
+              Réinitialiser
+            </button>
+            <button
+              onClick={() => setShowFilters(false)}
+              className="btn btn-primary flex-1"
+            >
+              Appliquer
+            </button>
           </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredArtworks.map((artwork) => (
-              <Link
-                key={artwork.id}
-                to={`/artwork/${artwork.id}`}
-                className="group"
-              >
-                {/* Card with gold border */}
-                <div className="card-gold bg-white dark:bg-black/20 overflow-hidden">
-                  {/* Image */}
-                  <div className="aspect-[4/5] bg-black/5 dark:bg-white/5 relative overflow-hidden">
-                    {artwork.image_url ? (
-                      <img
-                        src={artwork.image_url}
-                        alt={artwork.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <span className="material-symbols-outlined text-4xl text-black/20 dark:text-white/20">
-                          image
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="p-4">
-                    <p className="font-display italic text-lg group-hover:text-primary transition-colors">
-                      {artwork.artist || 'Unknown Artist'}
-                    </p>
-                    <p className="text-xs uppercase tracking-widest text-black/50 dark:text-white/50 mt-1">
-                      {artwork.title}
-                      {artwork.year && <span>, {artwork.year}</span>}
-                    </p>
-                    {artwork.medium && (
-                      <p className="text-sm italic text-black/40 dark:text-white/40 mt-2">
-                        {artwork.medium}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Floating Add Button */}
-      <Link
-        to="/scan"
-        className="fixed bottom-24 right-4 md:bottom-8 md:right-8 w-14 h-14 bg-primary rounded-full shadow-lg flex items-center justify-center text-bg-dark hover:bg-primary-hover transition-all glow-gold z-40"
-      >
-        <span className="material-symbols-outlined text-2xl">add</span>
-      </Link>
+        </div>
+      </Drawer>
     </div>
   )
 }
