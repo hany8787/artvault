@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import MuseumAutocomplete from '../components/MuseumAutocomplete'
 
 const ANALYSIS_STEPS = [
   'Analyse de l\'image...',
@@ -37,6 +38,7 @@ export default function Scan() {
     medium: '',
     dimensions: '',
     museum: '',
+    museum_id: null,
     museum_city: '',
     museum_country: '',
     description: '',
@@ -115,6 +117,7 @@ export default function Scan() {
       medium: '',
       dimensions: '',
       museum: '',
+      museum_id: null,
       museum_city: '',
       museum_country: '',
       description: '',
@@ -197,6 +200,7 @@ export default function Scan() {
 
     try {
       let imageUrl = null
+      let museumId = formData.museum_id
 
       // Upload image to Supabase Storage
       if (imageFile) {
@@ -216,6 +220,20 @@ export default function Scan() {
         imageUrl = publicUrl
       }
 
+      // Find or create museum if name provided but no ID
+      if (formData.museum.trim() && !museumId) {
+        const { data: foundMuseumId, error: museumError } = await supabase
+          .rpc('find_or_create_museum', {
+            p_name: formData.museum.trim(),
+            p_city: formData.museum_city.trim() || null,
+            p_country: formData.museum_country.trim() || null
+          })
+
+        if (!museumError && foundMuseumId) {
+          museumId = foundMuseumId
+        }
+      }
+
       // Save to database
       const { data, error: insertError } = await supabase
         .from('artworks')
@@ -231,6 +249,7 @@ export default function Scan() {
           medium: formData.medium.trim() || null,
           dimensions: formData.dimensions.trim() || null,
           museum: formData.museum.trim() || null,
+          museum_id: museumId,
           museum_city: formData.museum_city.trim() || null,
           museum_country: formData.museum_country.trim() || null,
           description: formData.description.trim() || null,
@@ -253,6 +272,17 @@ export default function Scan() {
   // Update form field
   function updateField(field, value) {
     setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  // Handle museum selection from autocomplete
+  function handleMuseumSelect(museum) {
+    setFormData(prev => ({
+      ...prev,
+      museum: museum.name,
+      museum_id: museum.id,
+      museum_city: museum.city || prev.museum_city,
+      museum_country: museum.country || prev.museum_country
+    }))
   }
 
   // Render based on step
@@ -546,11 +576,10 @@ export default function Scan() {
 
                 <div>
                   <label className="block text-white/60 text-sm mb-1">Musée / Collection</label>
-                  <input
-                    type="text"
+                  <MuseumAutocomplete
                     value={formData.museum}
-                    onChange={(e) => updateField('museum', e.target.value)}
-                    className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
+                    onChange={(value) => updateField('museum', value)}
+                    onMuseumSelect={handleMuseumSelect}
                     placeholder="Musée d'Orsay"
                   />
                 </div>
