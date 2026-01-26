@@ -135,9 +135,13 @@ export default function Scan() {
         setAnalysisStep(prev => (prev < ANALYSIS_STEPS.length - 1 ? prev + 1 : prev))
       }, 1000)
 
+      // Remove data URL prefix to get pure base64
+      const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '')
+      console.log('Sending imageBase64, length:', base64Data.length)
+
       // Call Supabase Edge Function for AI analysis
       const { data, error: fnError } = await supabase.functions.invoke('enrich-artwork', {
-        body: { imageBase64: imageData }
+        body: { imageBase64: base64Data }
       })
 
       clearInterval(progressInterval)
