@@ -123,40 +123,49 @@ export default function Scan() {
     setError('')
   }
 
-  // AI Analysis (simulated for MVP - connect to real API later)
+  // AI Analysis via Supabase Edge Function
   async function analyzeImage() {
     setStep('analyzing')
     setAnalysisStep(0)
     setError('')
 
     try {
-      // Simulate AI analysis with progressive steps
-      for (let i = 0; i < ANALYSIS_STEPS.length; i++) {
-        setAnalysisStep(i)
-        await new Promise(resolve => setTimeout(resolve, 800))
+      // Start progress animation
+      const progressInterval = setInterval(() => {
+        setAnalysisStep(prev => (prev < ANALYSIS_STEPS.length - 1 ? prev + 1 : prev))
+      }, 1000)
+
+      // Call Supabase Edge Function for AI analysis
+      const { data, error: fnError } = await supabase.functions.invoke('analyze-artwork', {
+        body: { image: imageData }
+      })
+
+      clearInterval(progressInterval)
+      setAnalysisStep(ANALYSIS_STEPS.length - 1)
+
+      if (fnError) throw fnError
+
+      // Use the real values from the API response
+      const analysis = {
+        title: data.title || '',
+        artist: data.artist || '',
+        artist_dates: data.artist_dates || '',
+        year: data.year || '',
+        period: data.period || '',
+        style: data.style || '',
+        medium: data.medium || '',
+        dimensions: data.dimensions || '',
+        museum: data.museum || '',
+        museum_city: data.museum_city || '',
+        museum_country: data.museum_country || '',
+        description: data.description || '',
+        curatorial_note: data.curatorial_note || ''
       }
 
-      // For MVP: Generate sample data
-      // In production: Call Claude Vision API or Supabase Edge Function
-      const mockAnalysis = {
-        title: 'Titre détecté',
-        artist: 'Artiste identifié',
-        artist_dates: '',
-        year: '',
-        period: '',
-        style: '',
-        medium: 'Huile sur toile',
-        dimensions: '',
-        museum: '',
-        museum_city: '',
-        museum_country: '',
-        description: 'Complétez la description de l\'œuvre...',
-        curatorial_note: ''
-      }
-
-      setFormData(mockAnalysis)
+      setFormData(analysis)
       setStep('form')
     } catch (err) {
+      console.error('Analysis error:', err)
       setError('Erreur lors de l\'analyse. Veuillez réessayer.')
       setStep('capture')
     }
