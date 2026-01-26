@@ -1,19 +1,21 @@
-import { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useRef, useEffect } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
 import MuseumAutocomplete from '../components/MuseumAutocomplete'
 
 const ANALYSIS_STEPS = [
-  'Analyse de l\'image...',
-  'Identification de l\'œuvre...',
-  'Recherche de l\'artiste...',
-  'Récupération des métadonnées...',
-  'Génération de la note curatoriale...'
+  'Scanning artwork...',
+  'Identifying composition...',
+  'Recognizing artist...',
+  'Fetching metadata...',
+  'Generating curatorial notes...'
 ]
 
 export default function Scan() {
   const { user } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
   const videoRef = useRef(null)
@@ -26,6 +28,7 @@ export default function Scan() {
   const [cameraActive, setCameraActive] = useState(false)
   const [analysisStep, setAnalysisStep] = useState(0)
   const [error, setError] = useState('')
+  const [flashEnabled, setFlashEnabled] = useState(false)
 
   // Form data
   const [formData, setFormData] = useState({
@@ -45,18 +48,30 @@ export default function Scan() {
     curatorial_note: ''
   })
 
+  // Auto-start camera on mount
+  useEffect(() => {
+    if (step === 'capture' && !imageData) {
+      startCamera()
+    }
+    return () => stopCamera()
+  }, [])
+
   // Camera functions
   async function startCamera() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
       })
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         setCameraActive(true)
       }
     } catch (err) {
-      setError('Impossible d\'accéder à la caméra. Veuillez autoriser l\'accès ou utiliser l\'import photo.')
+      setError('Camera access denied. Please enable camera or use gallery import.')
     }
   }
 
@@ -96,6 +111,7 @@ export default function Scan() {
     if (!file) return
 
     setImageFile(file)
+    stopCamera()
     const reader = new FileReader()
     reader.onload = (e) => {
       setImageData(e.target.result)
@@ -124,6 +140,7 @@ export default function Scan() {
       curatorial_note: ''
     })
     setError('')
+    startCamera()
   }
 
   // AI Analysis via Supabase Edge Function
@@ -140,7 +157,6 @@ export default function Scan() {
 
       // Remove data URL prefix to get pure base64
       const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '')
-      console.log('Sending imageBase64, length:', base64Data.length)
 
       // Call Supabase Edge Function for AI analysis
       const { data, error: fnError } = await supabase.functions.invoke('enrich-artwork', {
@@ -149,8 +165,6 @@ export default function Scan() {
 
       clearInterval(progressInterval)
       setAnalysisStep(ANALYSIS_STEPS.length - 1)
-
-      console.log('Edge Function response:', { data, error: fnError })
 
       if (fnError) throw fnError
 
@@ -178,7 +192,7 @@ export default function Scan() {
       setStep('form')
     } catch (err) {
       console.error('Analysis error:', err)
-      setError('Erreur lors de l\'analyse. Veuillez réessayer.')
+      setError('Analysis failed. Please try again.')
       setStep('capture')
     }
   }
@@ -191,7 +205,7 @@ export default function Scan() {
   // Save artwork
   async function saveArtwork() {
     if (!formData.title.trim()) {
-      setError('Le titre est requis')
+      setError('Title is required')
       return
     }
 
@@ -264,7 +278,7 @@ export default function Scan() {
       navigate(`/artwork/${data.id}`)
     } catch (err) {
       console.error('Save error:', err)
-      setError('Erreur lors de la sauvegarde. Veuillez réessayer.')
+      setError('Save failed. Please try again.')
       setStep('form')
     }
   }
@@ -285,392 +299,530 @@ export default function Scan() {
     }))
   }
 
-  // Render based on step
-  return (
-    <div className="min-h-screen pb-24">
-      {/* Header */}
-      <div className="p-4 md:p-8">
-        <p className="text-white/40 text-xs uppercase tracking-widest mb-1">Scanner</p>
-        <h1 className="font-display text-3xl font-bold italic text-white">
-          {step === 'capture' && 'Capturer une œuvre'}
-          {step === 'analyzing' && 'Analyse en cours'}
-          {step === 'form' && 'Détails de l\'œuvre'}
-          {step === 'saving' && 'Enregistrement...'}
-        </h1>
+  // CAPTURE VIEW - Full screen camera with Artiscan Elite style
+  if (step === 'capture') {
+    return (
+      <div className="fixed inset-0 bg-black z-50 flex flex-col">
+        {/* Hidden canvas for capture */}
+        <canvas ref={canvasRef} className="hidden" />
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+
+        {/* Camera / Image View */}
+        <div className="flex-1 relative overflow-hidden">
+          {imageData ? (
+            <img src={imageData} alt="Captured" className="w-full h-full object-cover" />
+          ) : (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover"
+            />
+          )}
+
+          {/* Top Gradient Overlay */}
+          <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/80 to-transparent" />
+
+          {/* Bottom Gradient Overlay */}
+          <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/90 to-transparent" />
+
+          {/* Header */}
+          <div className="absolute top-0 inset-x-0 p-4 flex items-center justify-between z-10">
+            <Link
+              to="/collection"
+              className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </Link>
+
+            <div className="text-center">
+              <p className="text-xs uppercase tracking-[0.2em] text-primary font-medium">
+                ArtScan
+              </p>
+              <p className="text-white/60 text-xs mt-0.5">
+                {imageData ? 'Ready to analyze' : 'Frame your artwork'}
+              </p>
+            </div>
+
+            <button
+              onClick={toggleTheme}
+              className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white"
+            >
+              <span className="material-symbols-outlined text-xl">
+                {theme === 'dark' ? 'light_mode' : 'dark_mode'}
+              </span>
+            </button>
+          </div>
+
+          {/* Viewfinder Frame with Corner Brackets */}
+          {!imageData && cameraActive && (
+            <div className="absolute inset-12 md:inset-24 pointer-events-none">
+              {/* Top Left Corner */}
+              <div className="absolute -top-1 -left-1">
+                <div className="w-12 h-[3px] bg-primary rounded-full" />
+                <div className="w-[3px] h-12 bg-primary rounded-full" />
+              </div>
+              {/* Top Right Corner */}
+              <div className="absolute -top-1 -right-1">
+                <div className="w-12 h-[3px] bg-primary rounded-full ml-auto" />
+                <div className="w-[3px] h-12 bg-primary rounded-full ml-auto" />
+              </div>
+              {/* Bottom Left Corner */}
+              <div className="absolute -bottom-1 -left-1">
+                <div className="w-[3px] h-12 bg-primary rounded-full" />
+                <div className="w-12 h-[3px] bg-primary rounded-full" />
+              </div>
+              {/* Bottom Right Corner */}
+              <div className="absolute -bottom-1 -right-1">
+                <div className="w-[3px] h-12 bg-primary rounded-full ml-auto" />
+                <div className="w-12 h-[3px] bg-primary rounded-full ml-auto" />
+              </div>
+
+              {/* Animated Scan Line */}
+              <div className="absolute inset-x-0 top-0 h-full overflow-hidden">
+                <div className="scan-line absolute inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent opacity-80" />
+              </div>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {error && (
+            <div className="absolute top-20 inset-x-4 bg-red-500/20 backdrop-blur-sm border border-red-500/50 text-red-200 px-4 py-3 rounded-xl text-center text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Image Preview Reset Button */}
+          {imageData && (
+            <button
+              onClick={resetCapture}
+              className="absolute top-20 right-4 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm text-white text-sm flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined text-lg">refresh</span>
+              Retake
+            </button>
+          )}
+        </div>
+
+        {/* Bottom Controls */}
+        <div className="absolute bottom-0 inset-x-0 pb-8 pt-4">
+          {imageData ? (
+            /* After capture - Analysis options */
+            <div className="px-6 space-y-3">
+              <button
+                onClick={analyzeImage}
+                className="w-full bg-primary text-bg-dark font-semibold py-4 rounded-full flex items-center justify-center gap-3 hover:bg-primary-hover transition-all glow-gold"
+              >
+                <span className="material-symbols-outlined">auto_awesome</span>
+                Analyze with AI
+              </button>
+              <button
+                onClick={skipToForm}
+                className="w-full bg-white/10 backdrop-blur-sm text-white py-3 rounded-full flex items-center justify-center gap-2 hover:bg-white/20 transition-colors"
+              >
+                <span className="material-symbols-outlined">edit</span>
+                Enter manually
+              </button>
+            </div>
+          ) : (
+            /* Camera controls */
+            <div className="flex items-center justify-around px-8">
+              {/* Gallery Button */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+              >
+                <span className="material-symbols-outlined text-2xl">photo_library</span>
+              </button>
+
+              {/* Capture Button - Big round with glow */}
+              <button
+                onClick={capturePhoto}
+                disabled={!cameraActive}
+                className="relative group"
+              >
+                {/* Outer glow ring */}
+                <div className="absolute inset-0 rounded-full bg-primary/30 animate-pulse-glow scale-110" />
+                {/* Main button */}
+                <div className="relative w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform group-disabled:opacity-50">
+                  <div className="w-16 h-16 rounded-full border-4 border-bg-dark/30" />
+                </div>
+              </button>
+
+              {/* Flash Button */}
+              <button
+                onClick={() => setFlashEnabled(!flashEnabled)}
+                className={`w-14 h-14 rounded-full backdrop-blur-sm flex items-center justify-center transition-colors ${
+                  flashEnabled
+                    ? 'bg-primary/30 text-primary'
+                    : 'bg-white/10 text-white hover:bg-white/20'
+                }`}
+              >
+                <span className="material-symbols-outlined text-2xl">
+                  {flashEnabled ? 'flash_on' : 'flash_off'}
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+    )
+  }
 
-      {/* Error message */}
-      {error && (
-        <div className="mx-4 mb-4 bg-red-500/20 border border-red-500/50 text-red-200 px-4 py-3 rounded-lg">
-          {error}
+  // ANALYZING VIEW
+  if (step === 'analyzing') {
+    return (
+      <div className="fixed inset-0 bg-black z-50 flex flex-col">
+        {/* Background image with blur */}
+        <div className="absolute inset-0">
+          <img src={imageData} alt="Analyzing" className="w-full h-full object-cover opacity-30 blur-sm" />
+          <div className="absolute inset-0 bg-black/60" />
         </div>
-      )}
 
-      {/* Step: Capture */}
-      {step === 'capture' && (
-        <div className="px-4">
-          {/* Image preview or camera */}
-          <div className="aspect-[3/4] max-w-md mx-auto relative rounded-xl overflow-hidden bg-surface-dark">
-            {imageData ? (
-              <>
-                <img src={imageData} alt="Capture" className="w-full h-full object-cover" />
-                <button
-                  onClick={resetCapture}
-                  className="absolute top-4 right-4 w-10 h-10 bg-black/50 rounded-full flex items-center justify-center text-white hover:bg-black/70 transition-colors"
-                >
-                  <span className="material-symbols-outlined">close</span>
-                </button>
-              </>
-            ) : cameraActive ? (
-              <>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-                {/* Focus brackets */}
-                <div className="absolute inset-8 pointer-events-none">
-                  <div className="absolute top-0 left-0 w-12 h-12 border-t-2 border-l-2 border-primary" />
-                  <div className="absolute top-0 right-0 w-12 h-12 border-t-2 border-r-2 border-primary" />
-                  <div className="absolute bottom-0 left-0 w-12 h-12 border-b-2 border-l-2 border-primary" />
-                  <div className="absolute bottom-0 right-0 w-12 h-12 border-b-2 border-r-2 border-primary" />
-                </div>
-              </>
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-8">
-                <span className="material-symbols-outlined text-6xl text-white/20 mb-4">photo_camera</span>
-                <p className="text-white/60 mb-2">Capturez une œuvre d'art</p>
-                <p className="text-white/40 text-sm">
-                  Utilisez l'appareil photo ou importez depuis votre galerie
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Hidden canvas for capture */}
-          <canvas ref={canvasRef} className="hidden" />
-
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-
-          {/* Buttons */}
-          <div className="max-w-md mx-auto mt-6 space-y-3">
-            {imageData ? (
-              <>
-                <button
-                  onClick={analyzeImage}
-                  className="w-full bg-primary text-bg-dark font-semibold py-4 rounded-lg flex items-center justify-center gap-2 hover:bg-primary-hover transition-colors"
-                >
-                  <span className="material-symbols-outlined">auto_awesome</span>
-                  Analyser avec l'IA
-                </button>
-                <button
-                  onClick={skipToForm}
-                  className="w-full border border-white/20 text-white py-3 rounded-lg flex items-center justify-center gap-2 hover:border-white/40 transition-colors"
-                >
-                  <span className="material-symbols-outlined">edit</span>
-                  Remplir manuellement
-                </button>
-              </>
-            ) : cameraActive ? (
-              <>
-                <button
-                  onClick={capturePhoto}
-                  className="w-full bg-primary text-bg-dark font-semibold py-4 rounded-lg flex items-center justify-center gap-2 hover:bg-primary-hover transition-colors"
-                >
-                  <span className="material-symbols-outlined">photo_camera</span>
-                  Prendre la photo
-                </button>
-                <button
-                  onClick={stopCamera}
-                  className="w-full border border-white/20 text-white py-3 rounded-lg flex items-center justify-center gap-2 hover:border-white/40 transition-colors"
-                >
-                  <span className="material-symbols-outlined">close</span>
-                  Annuler
-                </button>
-              </>
-            ) : (
-              <div className="flex gap-4">
-                <button
-                  onClick={startCamera}
-                  className="flex-1 bg-primary text-bg-dark font-semibold py-4 rounded-lg flex items-center justify-center gap-2 hover:bg-primary-hover transition-colors"
-                >
-                  <span className="material-symbols-outlined">photo_camera</span>
-                  Caméra
-                </button>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex-1 border border-white/20 text-white py-4 rounded-lg flex items-center justify-center gap-2 hover:border-white/40 transition-colors"
-                >
-                  <span className="material-symbols-outlined">image</span>
-                  Galerie
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Step: Analyzing */}
-      {step === 'analyzing' && (
-        <div className="px-4">
-          <div className="max-w-md mx-auto">
-            {/* Image preview */}
-            <div className="aspect-[3/4] rounded-xl overflow-hidden bg-surface-dark mb-6">
-              <img src={imageData} alt="Analyse" className="w-full h-full object-cover opacity-50" />
-            </div>
-
-            {/* Progress */}
-            <div className="glass rounded-xl p-6">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                  <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                </div>
-                <div>
-                  <p className="text-white font-medium">{ANALYSIS_STEPS[analysisStep]}</p>
-                  <p className="text-white/40 text-sm">Étape {analysisStep + 1}/{ANALYSIS_STEPS.length}</p>
-                </div>
-              </div>
-
-              {/* Progress bar */}
-              <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-500"
-                  style={{ width: `${((analysisStep + 1) / ANALYSIS_STEPS.length) * 100}%` }}
-                />
-              </div>
+        {/* Content */}
+        <div className="relative flex-1 flex flex-col items-center justify-center px-8">
+          {/* Artwork preview */}
+          <div className="w-48 h-64 rounded-xl overflow-hidden shadow-2xl mb-8 relative">
+            <img src={imageData} alt="Artwork" className="w-full h-full object-cover" />
+            {/* Scan animation overlay */}
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="scan-line absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent" />
             </div>
           </div>
+
+          {/* Analysis status */}
+          <div className="text-center mb-8">
+            <h2 className="font-display text-2xl italic text-white mb-2">
+              {ANALYSIS_STEPS[analysisStep]}
+            </h2>
+            <p className="text-white/40 text-sm">
+              Step {analysisStep + 1} of {ANALYSIS_STEPS.length}
+            </p>
+          </div>
+
+          {/* Progress dots */}
+          <div className="flex items-center gap-2">
+            {ANALYSIS_STEPS.map((_, index) => (
+              <div
+                key={index}
+                className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                  index <= analysisStep
+                    ? 'bg-primary scale-100'
+                    : 'bg-white/20 scale-75'
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Progress bar */}
+          <div className="w-64 h-1 bg-white/10 rounded-full mt-6 overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all duration-500 ease-out"
+              style={{ width: `${((analysisStep + 1) / ANALYSIS_STEPS.length) * 100}%` }}
+            />
+          </div>
         </div>
-      )}
+      </div>
+    )
+  }
 
-      {/* Step: Form */}
-      {step === 'form' && (
-        <div className="px-4">
-          <div className="max-w-2xl mx-auto">
-            {/* Image preview */}
-            {imageData && (
-              <div className="aspect-video max-w-sm mx-auto rounded-xl overflow-hidden bg-surface-dark mb-6">
-                <img src={imageData} alt="Œuvre" className="w-full h-full object-contain" />
+  // SAVING VIEW
+  if (step === 'saving') {
+    return (
+      <div className="fixed inset-0 bg-bg-light dark:bg-bg-dark z-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-primary/20 flex items-center justify-center">
+            <div className="w-10 h-10 border-3 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+          <h2 className="font-display text-2xl italic mb-2">Saving artwork...</h2>
+          <p className="text-black/40 dark:text-white/40 text-sm">Please wait</p>
+        </div>
+      </div>
+    )
+  }
+
+  // FORM VIEW - Editorial style
+  return (
+    <div className="min-h-screen bg-bg-light dark:bg-bg-dark">
+      {/* Fixed Header */}
+      <header className="sticky top-0 z-40 bg-bg-light/80 dark:bg-bg-dark/80 backdrop-blur-xl border-b border-black/5 dark:border-white/5">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+          <button
+            onClick={resetCapture}
+            className="flex items-center gap-2 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors"
+          >
+            <span className="material-symbols-outlined">arrow_back</span>
+            <span className="text-sm font-medium">Retake</span>
+          </button>
+
+          <h1 className="font-display text-lg italic text-primary">New Artwork</h1>
+
+          <button
+            onClick={toggleTheme}
+            className="w-10 h-10 rounded-full hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors"
+          >
+            <span className="material-symbols-outlined">
+              {theme === 'dark' ? 'light_mode' : 'dark_mode'}
+            </span>
+          </button>
+        </div>
+      </header>
+
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 px-4 py-3 rounded-xl text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Image Preview */}
+        {imageData && (
+          <div className="mb-8">
+            <div className="aspect-[4/3] max-w-md mx-auto rounded-xl overflow-hidden shadow-lg">
+              <img src={imageData} alt="Artwork" className="w-full h-full object-contain bg-black/5 dark:bg-white/5" />
+            </div>
+          </div>
+        )}
+
+        {/* Form Sections */}
+        <div className="space-y-8">
+          {/* Essential Information */}
+          <section className="card-gold bg-white dark:bg-black/20 rounded-xl p-6">
+            <h3 className="font-display text-xl italic text-primary mb-6 flex items-center gap-3">
+              <span className="material-symbols-outlined">info</span>
+              Essential Information
+            </h3>
+
+            <div className="space-y-5">
+              <div>
+                <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">
+                  Title *
+                </label>
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => updateField('title', e.target.value)}
+                  className="input-field"
+                  placeholder="Artwork title"
+                />
               </div>
-            )}
 
-            {/* Form */}
-            <div className="space-y-6">
-              {/* Basic Info */}
-              <div className="glass rounded-xl p-6 space-y-4">
-                <h3 className="font-display text-lg font-bold italic text-primary mb-4">
-                  Informations de base
-                </h3>
-
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-white/60 text-sm mb-1">Titre *</label>
+                  <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">
+                    Artist
+                  </label>
                   <input
                     type="text"
-                    value={formData.title}
-                    onChange={(e) => updateField('title', e.target.value)}
-                    className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                    placeholder="Titre de l'œuvre"
+                    value={formData.artist}
+                    onChange={(e) => updateField('artist', e.target.value)}
+                    className="input-field"
+                    placeholder="Artist name"
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-white/60 text-sm mb-1">Artiste</label>
-                    <input
-                      type="text"
-                      value={formData.artist}
-                      onChange={(e) => updateField('artist', e.target.value)}
-                      className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                      placeholder="Nom de l'artiste"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-white/60 text-sm mb-1">Dates de l'artiste</label>
-                    <input
-                      type="text"
-                      value={formData.artist_dates}
-                      onChange={(e) => updateField('artist_dates', e.target.value)}
-                      className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                      placeholder="1853-1890"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-white/60 text-sm mb-1">Année</label>
-                    <input
-                      type="text"
-                      value={formData.year}
-                      onChange={(e) => updateField('year', e.target.value)}
-                      className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                      placeholder="1889"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-white/60 text-sm mb-1">Période</label>
-                    <input
-                      type="text"
-                      value={formData.period}
-                      onChange={(e) => updateField('period', e.target.value)}
-                      className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                      placeholder="Post-impressionnisme"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-white/60 text-sm mb-1">Style</label>
-                    <input
-                      type="text"
-                      value={formData.style}
-                      onChange={(e) => updateField('style', e.target.value)}
-                      className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                      placeholder="Expressionnisme"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Technical Details */}
-              <div className="glass rounded-xl p-6 space-y-4">
-                <h3 className="font-display text-lg font-bold italic text-primary mb-4">
-                  Détails techniques
-                </h3>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-white/60 text-sm mb-1">Technique / Medium</label>
-                    <input
-                      type="text"
-                      value={formData.medium}
-                      onChange={(e) => updateField('medium', e.target.value)}
-                      className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                      placeholder="Huile sur toile"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-white/60 text-sm mb-1">Dimensions</label>
-                    <input
-                      type="text"
-                      value={formData.dimensions}
-                      onChange={(e) => updateField('dimensions', e.target.value)}
-                      className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                      placeholder="73,7 × 92,1 cm"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Location */}
-              <div className="glass rounded-xl p-6 space-y-4">
-                <h3 className="font-display text-lg font-bold italic text-primary mb-4">
-                  Localisation
-                </h3>
-
                 <div>
-                  <label className="block text-white/60 text-sm mb-1">Musée / Collection</label>
-                  <MuseumAutocomplete
-                    value={formData.museum}
-                    onChange={(value) => updateField('museum', value)}
-                    onMuseumSelect={handleMuseumSelect}
-                    placeholder="Musée d'Orsay"
+                  <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">
+                    Artist Dates
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.artist_dates}
+                    onChange={(e) => updateField('artist_dates', e.target.value)}
+                    className="input-field"
+                    placeholder="1853-1890"
                   />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-white/60 text-sm mb-1">Ville</label>
-                    <input
-                      type="text"
-                      value={formData.museum_city}
-                      onChange={(e) => updateField('museum_city', e.target.value)}
-                      className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                      placeholder="Paris"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-white/60 text-sm mb-1">Pays</label>
-                    <input
-                      type="text"
-                      value={formData.museum_country}
-                      onChange={(e) => updateField('museum_country', e.target.value)}
-                      className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                      placeholder="France"
-                    />
-                  </div>
                 </div>
               </div>
 
-              {/* Description */}
-              <div className="glass rounded-xl p-6 space-y-4">
-                <h3 className="font-display text-lg font-bold italic text-primary mb-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">
+                    Year
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.year}
+                    onChange={(e) => updateField('year', e.target.value)}
+                    className="input-field"
+                    placeholder="1889"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">
+                    Period
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.period}
+                    onChange={(e) => updateField('period', e.target.value)}
+                    className="input-field"
+                    placeholder="Post-Impressionism"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">
+                    Style
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.style}
+                    onChange={(e) => updateField('style', e.target.value)}
+                    className="input-field"
+                    placeholder="Expressionism"
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Technical Details */}
+          <section className="card-gold bg-white dark:bg-black/20 rounded-xl p-6">
+            <h3 className="font-display text-xl italic text-primary mb-6 flex items-center gap-3">
+              <span className="material-symbols-outlined">straighten</span>
+              Technical Details
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div>
+                <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">
+                  Medium / Technique
+                </label>
+                <input
+                  type="text"
+                  value={formData.medium}
+                  onChange={(e) => updateField('medium', e.target.value)}
+                  className="input-field"
+                  placeholder="Oil on canvas"
+                />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">
+                  Dimensions
+                </label>
+                <input
+                  type="text"
+                  value={formData.dimensions}
+                  onChange={(e) => updateField('dimensions', e.target.value)}
+                  className="input-field"
+                  placeholder="73.7 × 92.1 cm"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Location */}
+          <section className="card-gold bg-white dark:bg-black/20 rounded-xl p-6">
+            <h3 className="font-display text-xl italic text-primary mb-6 flex items-center gap-3">
+              <span className="material-symbols-outlined">museum</span>
+              Location
+            </h3>
+
+            <div className="space-y-5">
+              <div>
+                <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">
+                  Museum / Collection
+                </label>
+                <MuseumAutocomplete
+                  value={formData.museum}
+                  onChange={(value) => updateField('museum', value)}
+                  onMuseumSelect={handleMuseumSelect}
+                  placeholder="Museum of Modern Art"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">
+                    City
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.museum_city}
+                    onChange={(e) => updateField('museum_city', e.target.value)}
+                    className="input-field"
+                    placeholder="New York"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">
+                    Country
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.museum_country}
+                    onChange={(e) => updateField('museum_country', e.target.value)}
+                    className="input-field"
+                    placeholder="USA"
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Description & Notes */}
+          <section className="card-gold bg-white dark:bg-black/20 rounded-xl p-6">
+            <h3 className="font-display text-xl italic text-primary mb-6 flex items-center gap-3">
+              <span className="material-symbols-outlined">description</span>
+              Description & Notes
+            </h3>
+
+            <div className="space-y-5">
+              <div>
+                <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">
                   Description
-                </h3>
-
-                <div>
-                  <label className="block text-white/60 text-sm mb-1">Description de l'œuvre</label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => updateField('description', e.target.value)}
-                    rows={4}
-                    className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none resize-none"
-                    placeholder="Décrivez l'œuvre..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-white/60 text-sm mb-1">Note curatoriale</label>
-                  <textarea
-                    value={formData.curatorial_note}
-                    onChange={(e) => updateField('curatorial_note', e.target.value)}
-                    rows={3}
-                    className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none resize-none font-display italic"
-                    placeholder="Votre réflexion personnelle sur cette œuvre..."
-                  />
-                </div>
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => updateField('description', e.target.value)}
+                  rows={4}
+                  className="input-field resize-none"
+                  placeholder="Describe the artwork..."
+                />
               </div>
 
-              {/* Actions */}
-              <div className="flex gap-4 pb-8">
-                <button
-                  onClick={resetCapture}
-                  className="flex-1 border border-white/20 text-white py-4 rounded-lg flex items-center justify-center gap-2 hover:border-white/40 transition-colors"
-                >
-                  <span className="material-symbols-outlined">arrow_back</span>
-                  Retour
-                </button>
-                <button
-                  onClick={saveArtwork}
-                  className="flex-1 bg-primary text-bg-dark font-semibold py-4 rounded-lg flex items-center justify-center gap-2 hover:bg-primary-hover transition-colors"
-                >
-                  <span className="material-symbols-outlined">save</span>
-                  Enregistrer
-                </button>
+              <div>
+                <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">
+                  Curatorial Note
+                </label>
+                <textarea
+                  value={formData.curatorial_note}
+                  onChange={(e) => updateField('curatorial_note', e.target.value)}
+                  rows={3}
+                  className="input-field resize-none font-display italic"
+                  placeholder="Your personal reflection on this artwork..."
+                />
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </section>
 
-      {/* Step: Saving */}
-      {step === 'saving' && (
-        <div className="px-4 flex items-center justify-center min-h-[50vh]">
-          <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/20 flex items-center justify-center">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-            <p className="text-white font-medium">Enregistrement en cours...</p>
-            <p className="text-white/40 text-sm">Veuillez patienter</p>
+          {/* Actions */}
+          <div className="flex gap-4 pt-4 pb-24">
+            <button
+              onClick={resetCapture}
+              className="btn-outline flex-1 flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined">arrow_back</span>
+              Start Over
+            </button>
+            <button
+              onClick={saveArtwork}
+              className="btn-primary flex-1 flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined">check</span>
+              Save Artwork
+            </button>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }

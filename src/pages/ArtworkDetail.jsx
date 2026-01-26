@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
 
 export default function ArtworkDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { theme, toggleTheme } = useTheme()
 
   const [artwork, setArtwork] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -17,6 +19,7 @@ export default function ArtworkDetail() {
   const [editForm, setEditForm] = useState({})
   const [saving, setSaving] = useState(false)
   const [showFullImage, setShowFullImage] = useState(false)
+  const [relatedArtworks, setRelatedArtworks] = useState([])
 
   useEffect(() => {
     fetchArtwork()
@@ -37,30 +40,32 @@ export default function ArtworkDetail() {
     setArtwork(data)
     setEditForm(data)
     setLoading(false)
+
+    // Fetch related artworks by same artist
+    if (data.artist) {
+      const { data: related } = await supabase
+        .from('artworks')
+        .select('id, title, image_url, year')
+        .eq('user_id', user.id)
+        .eq('artist', data.artist)
+        .neq('id', id)
+        .limit(4)
+
+      if (related) setRelatedArtworks(related)
+    }
   }
 
   async function handleDelete() {
     setDeleting(true)
-
     try {
-      // Delete image from storage if exists
       if (artwork.image_url) {
         const imagePath = artwork.image_url.split('/').pop()
         if (imagePath) {
-          await supabase.storage
-            .from('artworks')
-            .remove([`${user.id}/${imagePath}`])
+          await supabase.storage.from('artworks').remove([`${user.id}/${imagePath}`])
         }
       }
-
-      // Delete from database
-      const { error } = await supabase
-        .from('artworks')
-        .delete()
-        .eq('id', id)
-
+      const { error } = await supabase.from('artworks').delete().eq('id', id)
       if (error) throw error
-
       navigate('/collection')
     } catch (err) {
       console.error('Delete error:', err)
@@ -71,9 +76,7 @@ export default function ArtworkDetail() {
 
   async function handleSave() {
     if (!editForm.title?.trim()) return
-
     setSaving(true)
-
     try {
       const { error } = await supabase
         .from('artworks')
@@ -93,15 +96,12 @@ export default function ArtworkDetail() {
           curatorial_note: editForm.curatorial_note?.trim() || null
         })
         .eq('id', id)
-
       if (error) throw error
-
       setArtwork(editForm)
       setIsEditing(false)
     } catch (err) {
       console.error('Save error:', err)
     }
-
     setSaving(false)
   }
 
@@ -109,390 +109,303 @@ export default function ArtworkDetail() {
     setEditForm(prev => ({ ...prev, [field]: value }))
   }
 
-  function cancelEdit() {
-    setEditForm(artwork)
-    setIsEditing(false)
-  }
-
   async function shareArtwork() {
-    const shareData = {
-      title: artwork.title,
-      text: `${artwork.title}${artwork.artist ? ` par ${artwork.artist}` : ''}`,
-      url: window.location.href
-    }
-
     try {
       if (navigator.share) {
-        await navigator.share(shareData)
+        await navigator.share({
+          title: artwork.title,
+          text: `${artwork.title}${artwork.artist ? ` by ${artwork.artist}` : ''}`,
+          url: window.location.href
+        })
       } else {
         await navigator.clipboard.writeText(window.location.href)
-        alert('Lien copié dans le presse-papier!')
+        alert('Link copied!')
       }
     } catch (err) {
       console.error('Share error:', err)
     }
-
     setShowMenu(false)
   }
 
   if (loading) {
     return (
-      <div className="p-4 flex items-center justify-center min-h-[50vh]">
-        <div className="text-primary">Chargement...</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-primary font-display italic text-xl">Loading...</div>
+      </div>
+    )
+  }
+
+  if (isEditing) {
+    return (
+      <div className="min-h-screen pb-8">
+        {/* Header */}
+        <header className="sticky top-0 z-40 bg-bg-light/80 dark:bg-bg-dark/80 backdrop-blur-xl border-b border-black/5 dark:border-white/5">
+          <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+            <button onClick={() => { setEditForm(artwork); setIsEditing(false) }} className="btn-ghost flex items-center gap-2">
+              <span className="material-symbols-outlined">close</span>
+              Cancel
+            </button>
+            <h1 className="font-display italic text-lg">Edit Artwork</h1>
+            <button
+              onClick={handleSave}
+              disabled={saving || !editForm.title?.trim()}
+              className="btn-primary py-2 px-4 disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </header>
+
+        <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+          <div>
+            <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Title *</label>
+            <input type="text" value={editForm.title || ''} onChange={(e) => updateEditField('title', e.target.value)} className="input-field text-2xl font-display italic" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Artist</label>
+              <input type="text" value={editForm.artist || ''} onChange={(e) => updateEditField('artist', e.target.value)} className="input-field" />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Artist Dates</label>
+              <input type="text" value={editForm.artist_dates || ''} onChange={(e) => updateEditField('artist_dates', e.target.value)} className="input-field" placeholder="1853-1890" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Year</label>
+              <input type="text" value={editForm.year || ''} onChange={(e) => updateEditField('year', e.target.value)} className="input-field" />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Period</label>
+              <input type="text" value={editForm.period || ''} onChange={(e) => updateEditField('period', e.target.value)} className="input-field" />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Style</label>
+              <input type="text" value={editForm.style || ''} onChange={(e) => updateEditField('style', e.target.value)} className="input-field" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Medium</label>
+              <input type="text" value={editForm.medium || ''} onChange={(e) => updateEditField('medium', e.target.value)} className="input-field" />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Dimensions</label>
+              <input type="text" value={editForm.dimensions || ''} onChange={(e) => updateEditField('dimensions', e.target.value)} className="input-field" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Museum</label>
+            <input type="text" value={editForm.museum || ''} onChange={(e) => updateEditField('museum', e.target.value)} className="input-field" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">City</label>
+              <input type="text" value={editForm.museum_city || ''} onChange={(e) => updateEditField('museum_city', e.target.value)} className="input-field" />
+            </div>
+            <div>
+              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Country</label>
+              <input type="text" value={editForm.museum_country || ''} onChange={(e) => updateEditField('museum_country', e.target.value)} className="input-field" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Description</label>
+            <textarea value={editForm.description || ''} onChange={(e) => updateEditField('description', e.target.value)} rows={4} className="input-field resize-none" />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Curatorial Note</label>
+            <textarea value={editForm.curatorial_note || ''} onChange={(e) => updateEditField('curatorial_note', e.target.value)} rows={3} className="input-field resize-none font-display italic" />
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="pb-8">
-      {/* Header with back and menu */}
-      <div className="p-4 flex items-center justify-between">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
-        >
-          <span className="material-symbols-outlined">arrow_back</span>
-          Retour
-        </button>
-
-        <div className="relative">
-          <button
-            onClick={() => setShowMenu(!showMenu)}
-            className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-white transition-colors"
-          >
-            <span className="material-symbols-outlined">more_vert</span>
+    <div className="min-h-screen">
+      {/* Floating Header */}
+      <header className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/50 to-transparent">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <button onClick={() => navigate(-1)} className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors">
+            <span className="material-symbols-outlined">arrow_back</span>
           </button>
-
-          {/* Dropdown Menu */}
-          {showMenu && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 top-full mt-2 w-48 glass rounded-xl overflow-hidden z-50">
-                <button
-                  onClick={() => {
-                    setIsEditing(true)
-                    setShowMenu(false)
-                  }}
-                  className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3"
-                >
-                  <span className="material-symbols-outlined text-xl">edit</span>
-                  Modifier
-                </button>
-                <button
-                  onClick={shareArtwork}
-                  className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3"
-                >
-                  <span className="material-symbols-outlined text-xl">share</span>
-                  Partager
-                </button>
-                <button
-                  onClick={() => {
-                    setShowDeleteModal(true)
-                    setShowMenu(false)
-                  }}
-                  className="w-full px-4 py-3 text-left text-red-400 hover:bg-red-500/10 flex items-center gap-3"
-                >
-                  <span className="material-symbols-outlined text-xl">delete</span>
-                  Supprimer
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Image */}
-      <div
-        className="aspect-[4/3] bg-surface-dark cursor-pointer"
-        onClick={() => artwork.image_url && setShowFullImage(true)}
-      >
-        {artwork.image_url ? (
-          <img
-            src={artwork.image_url}
-            alt={artwork.title}
-            className="w-full h-full object-contain"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <span className="material-symbols-outlined text-6xl text-white/20">image</span>
-          </div>
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="p-4 md:p-8">
-        {isEditing ? (
-          /* Edit Mode */
-          <div className="space-y-6 max-w-2xl">
-            {/* Basic Info */}
-            <div className="space-y-4">
-              <div>
-                <label className="block text-white/60 text-sm mb-1">Titre *</label>
-                <input
-                  type="text"
-                  value={editForm.title || ''}
-                  onChange={(e) => updateEditField('title', e.target.value)}
-                  className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-white/60 text-sm mb-1">Artiste</label>
-                  <input
-                    type="text"
-                    value={editForm.artist || ''}
-                    onChange={(e) => updateEditField('artist', e.target.value)}
-                    className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-white/60 text-sm mb-1">Dates de l'artiste</label>
-                  <input
-                    type="text"
-                    value={editForm.artist_dates || ''}
-                    onChange={(e) => updateEditField('artist_dates', e.target.value)}
-                    className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-white/60 text-sm mb-1">Année</label>
-                  <input
-                    type="text"
-                    value={editForm.year || ''}
-                    onChange={(e) => updateEditField('year', e.target.value)}
-                    className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-white/60 text-sm mb-1">Période</label>
-                  <input
-                    type="text"
-                    value={editForm.period || ''}
-                    onChange={(e) => updateEditField('period', e.target.value)}
-                    className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-white/60 text-sm mb-1">Style</label>
-                  <input
-                    type="text"
-                    value={editForm.style || ''}
-                    onChange={(e) => updateEditField('style', e.target.value)}
-                    className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-white/60 text-sm mb-1">Technique / Medium</label>
-                  <input
-                    type="text"
-                    value={editForm.medium || ''}
-                    onChange={(e) => updateEditField('medium', e.target.value)}
-                    className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-white/60 text-sm mb-1">Dimensions</label>
-                  <input
-                    type="text"
-                    value={editForm.dimensions || ''}
-                    onChange={(e) => updateEditField('dimensions', e.target.value)}
-                    className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-white/60 text-sm mb-1">Musée / Collection</label>
-                <input
-                  type="text"
-                  value={editForm.museum || ''}
-                  onChange={(e) => updateEditField('museum', e.target.value)}
-                  className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-white/60 text-sm mb-1">Ville</label>
-                  <input
-                    type="text"
-                    value={editForm.museum_city || ''}
-                    onChange={(e) => updateEditField('museum_city', e.target.value)}
-                    className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-white/60 text-sm mb-1">Pays</label>
-                  <input
-                    type="text"
-                    value={editForm.museum_country || ''}
-                    onChange={(e) => updateEditField('museum_country', e.target.value)}
-                    className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-white/60 text-sm mb-1">Description</label>
-                <textarea
-                  value={editForm.description || ''}
-                  onChange={(e) => updateEditField('description', e.target.value)}
-                  rows={4}
-                  className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none resize-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-white/60 text-sm mb-1">Note curatoriale</label>
-                <textarea
-                  value={editForm.curatorial_note || ''}
-                  onChange={(e) => updateEditField('curatorial_note', e.target.value)}
-                  rows={3}
-                  className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none resize-none font-display italic"
-                />
-              </div>
-            </div>
-
-            {/* Edit Actions */}
-            <div className="flex gap-4">
-              <button
-                onClick={cancelEdit}
-                className="flex-1 border border-white/20 text-white py-3 rounded-lg hover:border-white/40 transition-colors"
-              >
-                Annuler
+          <div className="flex items-center gap-2">
+            <button onClick={toggleTheme} className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors">
+              <span className="material-symbols-outlined">{theme === 'dark' ? 'light_mode' : 'dark_mode'}</span>
+            </button>
+            <div className="relative">
+              <button onClick={() => setShowMenu(!showMenu)} className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors">
+                <span className="material-symbols-outlined">more_vert</span>
               </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || !editForm.title?.trim()}
-                className="flex-1 bg-primary text-bg-dark font-semibold py-3 rounded-lg hover:bg-primary-hover transition-colors disabled:opacity-50"
-              >
-                {saving ? 'Enregistrement...' : 'Enregistrer'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* View Mode */
-          <>
-            {/* Title & Artist */}
-            <div className="mb-6">
-              <h1 className="font-display text-3xl font-bold italic text-white mb-2">
-                {artwork.title}
-              </h1>
-              <p className="text-xl text-white/80">
-                {artwork.artist || 'Artiste inconnu'}
-                {artwork.artist_dates && (
-                  <span className="text-white/40 ml-2">({artwork.artist_dates})</span>
-                )}
-              </p>
-              {artwork.year && (
-                <p className="text-white/60 mt-1">{artwork.year}</p>
+              {showMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-48 glass-dark rounded-xl overflow-hidden z-50">
+                    <button onClick={() => { setIsEditing(true); setShowMenu(false) }} className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3">
+                      <span className="material-symbols-outlined text-xl">edit</span>Edit
+                    </button>
+                    <button onClick={shareArtwork} className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3">
+                      <span className="material-symbols-outlined text-xl">share</span>Share
+                    </button>
+                    <button onClick={() => { setShowDeleteModal(true); setShowMenu(false) }} className="w-full px-4 py-3 text-left text-red-400 hover:bg-red-500/10 flex items-center gap-3">
+                      <span className="material-symbols-outlined text-xl">delete</span>Delete
+                    </button>
+                  </div>
+                </>
               )}
             </div>
+          </div>
+        </div>
+      </header>
 
-            {/* Tags */}
-            {(artwork.period || artwork.style || artwork.medium) && (
-              <div className="flex flex-wrap gap-2 mb-6">
+      {/* Hero Image */}
+      <div className="relative h-[70vh] bg-black cursor-pointer group" onClick={() => artwork.image_url && setShowFullImage(true)}>
+        {artwork.image_url ? (
+          <img src={artwork.image_url} alt={artwork.title} className="w-full h-full object-contain group-hover:scale-[1.02] transition-transform duration-700" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="material-symbols-outlined text-8xl text-white/20">image</span>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
+      </div>
+
+      {/* Title Section */}
+      <section className="relative -mt-32 z-10 text-center px-4 pb-12">
+        <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold italic text-white drop-shadow-lg mb-6">
+          {artwork.title}
+        </h1>
+
+        {/* Artist with gold lines */}
+        <div className="divider-text max-w-md mx-auto mb-8">
+          <span className="font-display italic text-xl text-white/90">
+            {artwork.artist || 'Unknown Artist'}
+            {artwork.artist_dates && <span className="text-white/50 ml-2">({artwork.artist_dates})</span>}
+          </span>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex items-center justify-center gap-4">
+          <button onClick={shareArtwork} className="btn-outline bg-white/10 backdrop-blur-xl text-white border-white/20 hover:border-primary hover:text-primary flex items-center gap-2">
+            <span className="material-symbols-outlined">share</span>
+            Share
+          </button>
+          <button onClick={() => window.print()} className="btn-outline bg-white/10 backdrop-blur-xl text-white border-white/20 hover:border-primary hover:text-primary flex items-center gap-2">
+            <span className="material-symbols-outlined">download</span>
+            Download
+          </button>
+        </div>
+      </section>
+
+      {/* Content */}
+      <section className="max-w-6xl mx-auto px-4 py-12">
+        <div className="grid md:grid-cols-3 gap-12">
+          {/* Left: Metadata */}
+          <div className="space-y-8">
+            {artwork.year && (
+              <div>
+                <p className="text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-1">Year</p>
+                <p className="font-display text-2xl">{artwork.year}</p>
+              </div>
+            )}
+            {artwork.medium && (
+              <div>
+                <p className="text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-1">Medium</p>
+                <p className="font-display italic text-lg">{artwork.medium}</p>
+              </div>
+            )}
+            {artwork.dimensions && (
+              <div>
+                <p className="text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-1">Dimensions</p>
+                <p className="text-lg">{artwork.dimensions}</p>
+              </div>
+            )}
+            {artwork.museum && (
+              <div>
+                <p className="text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-1">Location</p>
+                <p className="text-lg">{artwork.museum}</p>
+                {(artwork.museum_city || artwork.museum_country) && (
+                  <p className="text-black/50 dark:text-white/50">{[artwork.museum_city, artwork.museum_country].filter(Boolean).join(', ')}</p>
+                )}
+              </div>
+            )}
+            {(artwork.period || artwork.style) && (
+              <div className="flex flex-wrap gap-2">
                 {artwork.period && (
-                  <span className="px-3 py-1 text-xs font-medium uppercase tracking-wider border border-white/20 rounded-sm text-white/70">
-                    {artwork.period}
-                  </span>
+                  <span className="px-3 py-1 text-xs uppercase tracking-widest border border-primary/30 text-primary">{artwork.period}</span>
                 )}
                 {artwork.style && (
-                  <span className="px-3 py-1 text-xs font-medium uppercase tracking-wider border border-white/20 rounded-sm text-white/70">
-                    {artwork.style}
-                  </span>
-                )}
-                {artwork.medium && (
-                  <span className="px-3 py-1 text-xs font-medium uppercase tracking-wider border border-primary/50 rounded-sm text-primary/80">
-                    {artwork.medium}
-                  </span>
+                  <span className="px-3 py-1 text-xs uppercase tracking-widest border border-black/20 dark:border-white/20">{artwork.style}</span>
                 )}
               </div>
             )}
+          </div>
 
-            {/* Museum */}
-            {artwork.museum && (
-              <div className="glass rounded-xl p-4 mb-6">
-                <div className="flex items-start gap-3">
-                  <span className="material-symbols-outlined text-primary">museum</span>
-                  <div>
-                    <p className="text-white font-medium">{artwork.museum}</p>
-                    {(artwork.museum_city || artwork.museum_country) && (
-                      <p className="text-white/60 text-sm">
-                        {[artwork.museum_city, artwork.museum_country].filter(Boolean).join(', ')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Description */}
+          {/* Right: Description */}
+          <div className="md:col-span-2 space-y-8">
             {artwork.description && (
-              <div className="mb-6">
-                <p className="text-white/40 text-xs uppercase tracking-widest mb-2">Description</p>
-                <p className="text-white/80 leading-relaxed">{artwork.description}</p>
+              <div>
+                <p className="text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-4">About This Work</p>
+                <p className="drop-cap text-lg leading-relaxed font-body">{artwork.description}</p>
               </div>
             )}
 
-            {/* Curatorial Note */}
             {artwork.curatorial_note && (
-              <div className="border-l-2 border-primary pl-4 mb-6">
-                <p className="text-white/40 text-xs uppercase tracking-widest mb-2">Note curatoriale</p>
-                <p className="font-display italic text-primary/90 leading-relaxed text-lg">
-                  "{artwork.curatorial_note}"
+              <div className="editorial-quote py-6">
+                <p className="font-display italic text-xl leading-relaxed text-primary/90">
+                  {artwork.curatorial_note}
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      </section>
 
-            {/* Details */}
-            {artwork.dimensions && (
-              <div className="text-sm text-white/60 mb-6">
-                <span className="text-white/40">Dimensions : </span>
-                {artwork.dimensions}
-              </div>
-            )}
+      {/* Related Works */}
+      {relatedArtworks.length > 0 && (
+        <section className="max-w-6xl mx-auto px-4 py-12 border-t border-black/10 dark:border-white/10">
+          <h2 className="text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-8">
+            More by {artwork.artist}
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {relatedArtworks.map(related => (
+              <Link key={related.id} to={`/artwork/${related.id}`} className="group">
+                <div className="aspect-[4/5] bg-black/5 dark:bg-white/5 overflow-hidden mb-2">
+                  {related.image_url ? (
+                    <img src={related.image_url} alt={related.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="material-symbols-outlined text-2xl text-black/20 dark:text-white/20">image</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-sm truncate group-hover:text-primary transition-colors">{related.title}</p>
+                {related.year && <p className="text-xs text-black/40 dark:text-white/40">{related.year}</p>}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
-            {/* Added date */}
-            <div className="text-sm text-white/40 pt-4 border-t border-white/10">
-              Ajoutée le {new Date(artwork.created_at).toLocaleDateString('fr-FR', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric'
-              })}
-            </div>
-          </>
-        )}
-      </div>
+      {/* Footer */}
+      <footer className="max-w-6xl mx-auto px-4 py-8 text-center">
+        <p className="text-sm text-black/30 dark:text-white/30">
+          Added {new Date(artwork.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+        </p>
+      </footer>
 
       {/* Full Image Modal */}
       {showFullImage && artwork.image_url && (
-        <div
-          className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowFullImage(false)}
-        >
-          <button
-            onClick={() => setShowFullImage(false)}
-            className="absolute top-4 right-4 w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-          >
+        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center" onClick={() => setShowFullImage(false)}>
+          <button onClick={() => setShowFullImage(false)} className="absolute top-4 right-4 w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors z-10">
             <span className="material-symbols-outlined">close</span>
           </button>
-          <img
-            src={artwork.image_url}
-            alt={artwork.title}
-            className="max-w-full max-h-full object-contain"
-          />
+          <img src={artwork.image_url} alt={artwork.title} className="max-w-full max-h-full object-contain" />
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
           <div className="glass rounded-xl p-6 max-w-sm w-full">
@@ -500,26 +413,13 @@ export default function ArtworkDetail() {
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
                 <span className="material-symbols-outlined text-3xl text-red-400">delete</span>
               </div>
-              <h3 className="text-xl font-semibold text-white mb-2">Supprimer cette œuvre ?</h3>
-              <p className="text-white/60">
-                Cette action est irréversible. L'œuvre sera définitivement supprimée de votre collection.
-              </p>
+              <h3 className="text-xl font-semibold mb-2">Delete this artwork?</h3>
+              <p className="text-black/60 dark:text-white/60">This action cannot be undone.</p>
             </div>
-
             <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                disabled={deleting}
-                className="flex-1 border border-white/20 text-white py-3 rounded-lg hover:border-white/40 transition-colors disabled:opacity-50"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="flex-1 bg-red-500 text-white font-semibold py-3 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
-              >
-                {deleting ? 'Suppression...' : 'Supprimer'}
+              <button onClick={() => setShowDeleteModal(false)} disabled={deleting} className="btn-outline flex-1 disabled:opacity-50">Cancel</button>
+              <button onClick={handleDelete} disabled={deleting} className="flex-1 bg-red-500 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50">
+                {deleting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
