@@ -143,6 +143,8 @@ export default function Scan() {
       clearInterval(progressInterval)
       setAnalysisStep(ANALYSIS_STEPS.length - 1)
 
+      console.log('Edge Function response:', { data, error: fnError })
+
       if (fnError) throw fnError
 
       // Use the real values from the API response
