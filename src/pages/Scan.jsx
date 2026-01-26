@@ -136,8 +136,8 @@ export default function Scan() {
       }, 1000)
 
       // Call Supabase Edge Function for AI analysis
-      const { data, error: fnError } = await supabase.functions.invoke('analyze-artwork', {
-        body: { image: imageData }
+      const { data, error: fnError } = await supabase.functions.invoke('enrich-artwork', {
+        body: { imageBase64: imageData }
       })
 
       clearInterval(progressInterval)
