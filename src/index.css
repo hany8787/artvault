@@ -5,11 +5,14 @@
 /* Base styles */
 @layer base {
   html {
-    @apply bg-bg-light text-text-light transition-colors duration-300;
+    background-color: #f9f9f7;
+    color: #181611;
+    transition: background-color 0.3s, color 0.3s;
   }
 
   html.dark {
-    @apply bg-bg-dark text-text-dark;
+    background-color: #221e10;
+    color: #f4f4f0;
   }
 
   body {
@@ -101,7 +104,19 @@
 /* Tab styles */
 .tab {
   @apply px-4 py-2 text-xs uppercase tracking-widest font-sans transition-colors cursor-pointer;
-  @apply text-text-light/50 dark:text-text-dark/50 hover:text-text-light dark:hover:text-text-dark;
+  color: rgba(24, 22, 17, 0.5);
+}
+
+.tab:hover {
+  color: #181611;
+}
+
+.dark .tab {
+  color: rgba(244, 244, 240, 0.5);
+}
+
+.dark .tab:hover {
+  color: #f4f4f0;
 }
 
 .tab.active {
@@ -111,22 +126,52 @@
 /* Form inputs for light/dark */
 .input-field {
   @apply w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/20 rounded-lg px-4 py-3;
-  @apply text-text-light dark:text-text-dark placeholder:text-text-light/40 dark:placeholder:text-text-dark/40;
   @apply focus:border-primary focus:outline-none transition-colors;
+  color: #181611;
+}
+
+.input-field::placeholder {
+  color: rgba(24, 22, 17, 0.4);
+}
+
+.dark .input-field {
+  color: #f4f4f0;
+}
+
+.dark .input-field::placeholder {
+  color: rgba(244, 244, 240, 0.4);
 }
 
 /* Button variants */
 .btn-primary {
-  @apply bg-primary text-bg-dark font-semibold py-3 px-6 rounded-lg;
+  @apply bg-primary font-semibold py-3 px-6 rounded-lg;
   @apply hover:bg-primary-hover transition-colors disabled:opacity-50;
+  color: #221e10;
 }
 
 .btn-outline {
-  @apply border border-black/20 dark:border-white/20 text-text-light dark:text-text-dark py-3 px-6 rounded-lg;
+  @apply border border-black/20 dark:border-white/20 py-3 px-6 rounded-lg;
   @apply hover:border-primary hover:text-primary transition-colors;
+  color: #181611;
+}
+
+.dark .btn-outline {
+  color: #f4f4f0;
 }
 
 .btn-ghost {
-  @apply text-text-light/60 dark:text-text-dark/60 py-2 px-4;
-  @apply hover:text-text-light dark:hover:text-text-dark transition-colors;
+  @apply py-2 px-4 transition-colors;
+  color: rgba(24, 22, 17, 0.6);
+}
+
+.btn-ghost:hover {
+  color: #181611;
+}
+
+.dark .btn-ghost {
+  color: rgba(244, 244, 240, 0.6);
+}
+
+.dark .btn-ghost:hover {
+  color: #f4f4f0;
 }
