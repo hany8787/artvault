@@ -3,6 +3,10 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
+import Input, { Textarea } from '../components/ui/Input'
+import { ConfirmDialog } from '../components/ui/Modal'
+import Loader from '../components/ui/Loader'
+import { ArtworkCard } from '../components/ui/Card'
 
 export default function ArtworkDetail() {
   const { id } = useParams()
@@ -20,6 +24,7 @@ export default function ArtworkDetail() {
   const [saving, setSaving] = useState(false)
   const [showFullImage, setShowFullImage] = useState(false)
   const [relatedArtworks, setRelatedArtworks] = useState([])
+  const [togglingFavorite, setTogglingFavorite] = useState(false)
 
   useEffect(() => {
     fetchArtwork()
@@ -45,7 +50,7 @@ export default function ArtworkDetail() {
     if (data.artist) {
       const { data: related } = await supabase
         .from('artworks')
-        .select('id, title, image_url, year')
+        .select('id, title, image_url, year, artist')
         .eq('user_id', user.id)
         .eq('artist', data.artist)
         .neq('id', id)
@@ -53,6 +58,27 @@ export default function ArtworkDetail() {
 
       if (related) setRelatedArtworks(related)
     }
+  }
+
+  async function toggleFavorite() {
+    if (togglingFavorite) return
+    setTogglingFavorite(true)
+
+    try {
+      const newValue = !artwork.is_favorite
+      const { error } = await supabase
+        .from('artworks')
+        .update({ is_favorite: newValue })
+        .eq('id', id)
+
+      if (!error) {
+        setArtwork(prev => ({ ...prev, is_favorite: newValue }))
+      }
+    } catch (err) {
+      console.error('Toggle favorite error:', err)
+    }
+
+    setTogglingFavorite(false)
   }
 
   async function handleDelete() {
@@ -97,7 +123,7 @@ export default function ArtworkDetail() {
         })
         .eq('id', id)
       if (error) throw error
-      setArtwork(editForm)
+      setArtwork({ ...artwork, ...editForm })
       setIsEditing(false)
     } catch (err) {
       console.error('Save error:', err)
@@ -114,12 +140,12 @@ export default function ArtworkDetail() {
       if (navigator.share) {
         await navigator.share({
           title: artwork.title,
-          text: `${artwork.title}${artwork.artist ? ` by ${artwork.artist}` : ''}`,
+          text: `${artwork.title}${artwork.artist ? ` de ${artwork.artist}` : ''}`,
           url: window.location.href
         })
       } else {
         await navigator.clipboard.writeText(window.location.href)
-        alert('Link copied!')
+        alert('Lien copié !')
       }
     } catch (err) {
       console.error('Share error:', err)
@@ -130,93 +156,130 @@ export default function ArtworkDetail() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-primary font-display italic text-xl">Loading...</div>
+        <Loader message="Chargement..." />
       </div>
     )
   }
 
+  // Edit mode
   if (isEditing) {
     return (
       <div className="min-h-screen pb-8">
         {/* Header */}
         <header className="sticky top-0 z-40 bg-bg-light/80 dark:bg-bg-dark/80 backdrop-blur-xl border-b border-black/5 dark:border-white/5">
           <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-            <button onClick={() => { setEditForm(artwork); setIsEditing(false) }} className="btn-ghost flex items-center gap-2">
+            <button
+              onClick={() => { setEditForm(artwork); setIsEditing(false) }}
+              className="btn btn-ghost"
+            >
               <span className="material-symbols-outlined">close</span>
-              Cancel
+              Annuler
             </button>
-            <h1 className="font-display italic text-lg">Edit Artwork</h1>
+            <h1 className="font-display italic text-lg">Modifier</h1>
             <button
               onClick={handleSave}
               disabled={saving || !editForm.title?.trim()}
-              className="btn-primary py-2 px-4 disabled:opacity-50"
+              className="btn btn-primary"
             >
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? 'Enregistrement...' : 'Enregistrer'}
             </button>
           </div>
         </header>
 
         <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-          <div>
-            <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Title *</label>
-            <input type="text" value={editForm.title || ''} onChange={(e) => updateEditField('title', e.target.value)} className="input-field text-2xl font-display italic" />
-          </div>
+          {/* Title */}
+          <Input
+            label="Titre *"
+            value={editForm.title || ''}
+            onChange={(e) => updateEditField('title', e.target.value)}
+            className="text-2xl font-display italic"
+          />
+
+          {/* Artist row */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Artist</label>
-              <input type="text" value={editForm.artist || ''} onChange={(e) => updateEditField('artist', e.target.value)} className="input-field" />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Artist Dates</label>
-              <input type="text" value={editForm.artist_dates || ''} onChange={(e) => updateEditField('artist_dates', e.target.value)} className="input-field" placeholder="1853-1890" />
-            </div>
+            <Input
+              label="Artiste"
+              value={editForm.artist || ''}
+              onChange={(e) => updateEditField('artist', e.target.value)}
+            />
+            <Input
+              label="Dates de l'artiste"
+              value={editForm.artist_dates || ''}
+              onChange={(e) => updateEditField('artist_dates', e.target.value)}
+              placeholder="1853-1890"
+            />
           </div>
+
+          {/* Year, Period, Style */}
           <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Year</label>
-              <input type="text" value={editForm.year || ''} onChange={(e) => updateEditField('year', e.target.value)} className="input-field" />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Period</label>
-              <input type="text" value={editForm.period || ''} onChange={(e) => updateEditField('period', e.target.value)} className="input-field" />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Style</label>
-              <input type="text" value={editForm.style || ''} onChange={(e) => updateEditField('style', e.target.value)} className="input-field" />
-            </div>
+            <Input
+              label="Année"
+              value={editForm.year || ''}
+              onChange={(e) => updateEditField('year', e.target.value)}
+            />
+            <Input
+              label="Période"
+              value={editForm.period || ''}
+              onChange={(e) => updateEditField('period', e.target.value)}
+            />
+            <Input
+              label="Style"
+              value={editForm.style || ''}
+              onChange={(e) => updateEditField('style', e.target.value)}
+            />
           </div>
+
+          {/* Medium, Dimensions */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Medium</label>
-              <input type="text" value={editForm.medium || ''} onChange={(e) => updateEditField('medium', e.target.value)} className="input-field" />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Dimensions</label>
-              <input type="text" value={editForm.dimensions || ''} onChange={(e) => updateEditField('dimensions', e.target.value)} className="input-field" />
-            </div>
+            <Input
+              label="Technique"
+              value={editForm.medium || ''}
+              onChange={(e) => updateEditField('medium', e.target.value)}
+            />
+            <Input
+              label="Dimensions"
+              value={editForm.dimensions || ''}
+              onChange={(e) => updateEditField('dimensions', e.target.value)}
+            />
           </div>
-          <div>
-            <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Museum</label>
-            <input type="text" value={editForm.museum || ''} onChange={(e) => updateEditField('museum', e.target.value)} className="input-field" />
-          </div>
+
+          {/* Museum */}
+          <Input
+            label="Musée"
+            value={editForm.museum || ''}
+            onChange={(e) => updateEditField('museum', e.target.value)}
+          />
+
+          {/* City, Country */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">City</label>
-              <input type="text" value={editForm.museum_city || ''} onChange={(e) => updateEditField('museum_city', e.target.value)} className="input-field" />
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Country</label>
-              <input type="text" value={editForm.museum_country || ''} onChange={(e) => updateEditField('museum_country', e.target.value)} className="input-field" />
-            </div>
+            <Input
+              label="Ville"
+              value={editForm.museum_city || ''}
+              onChange={(e) => updateEditField('museum_city', e.target.value)}
+            />
+            <Input
+              label="Pays"
+              value={editForm.museum_country || ''}
+              onChange={(e) => updateEditField('museum_country', e.target.value)}
+            />
           </div>
-          <div>
-            <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Description</label>
-            <textarea value={editForm.description || ''} onChange={(e) => updateEditField('description', e.target.value)} rows={4} className="input-field resize-none" />
-          </div>
-          <div>
-            <label className="block text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-2">Curatorial Note</label>
-            <textarea value={editForm.curatorial_note || ''} onChange={(e) => updateEditField('curatorial_note', e.target.value)} rows={3} className="input-field resize-none font-display italic" />
-          </div>
+
+          {/* Description */}
+          <Textarea
+            label="Description"
+            value={editForm.description || ''}
+            onChange={(e) => updateEditField('description', e.target.value)}
+            rows={4}
+          />
+
+          {/* Curatorial note */}
+          <Textarea
+            label="Note curatoriale"
+            value={editForm.curatorial_note || ''}
+            onChange={(e) => updateEditField('curatorial_note', e.target.value)}
+            rows={3}
+            className="font-display italic"
+          />
         </div>
       </div>
     )
@@ -227,29 +290,72 @@ export default function ArtworkDetail() {
       {/* Floating Header */}
       <header className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/50 to-transparent">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <button onClick={() => navigate(-1)} className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors">
+          <button
+            onClick={() => navigate(-1)}
+            className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+          >
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
+
           <div className="flex items-center gap-2">
-            <button onClick={toggleTheme} className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors">
-              <span className="material-symbols-outlined">{theme === 'dark' ? 'light_mode' : 'dark_mode'}</span>
+            {/* Favorite button */}
+            <button
+              onClick={toggleFavorite}
+              disabled={togglingFavorite}
+              className={`w-10 h-10 backdrop-blur-xl rounded-full flex items-center justify-center transition-all ${
+                artwork.is_favorite
+                  ? 'bg-accent text-white'
+                  : 'bg-white/10 text-white hover:bg-white/20'
+              }`}
+            >
+              <span className="material-symbols-outlined">
+                {artwork.is_favorite ? 'favorite' : 'favorite_border'}
+              </span>
             </button>
+
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+            >
+              <span className="material-symbols-outlined">
+                {theme === 'dark' ? 'light_mode' : 'dark_mode'}
+              </span>
+            </button>
+
+            {/* Menu */}
             <div className="relative">
-              <button onClick={() => setShowMenu(!showMenu)} className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors">
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+              >
                 <span className="material-symbols-outlined">more_vert</span>
               </button>
+
               {showMenu && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-48 glass-dark rounded-xl overflow-hidden z-50">
-                    <button onClick={() => { setIsEditing(true); setShowMenu(false) }} className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3">
-                      <span className="material-symbols-outlined text-xl">edit</span>Edit
+                  <div className="absolute right-0 top-full mt-2 w-52 bg-black/80 backdrop-blur-xl rounded-xl overflow-hidden z-50 border border-white/10">
+                    <button
+                      onClick={() => { setIsEditing(true); setShowMenu(false) }}
+                      className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-xl">edit</span>
+                      Modifier
                     </button>
-                    <button onClick={shareArtwork} className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3">
-                      <span className="material-symbols-outlined text-xl">share</span>Share
+                    <button
+                      onClick={shareArtwork}
+                      className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-xl">share</span>
+                      Partager
                     </button>
-                    <button onClick={() => { setShowDeleteModal(true); setShowMenu(false) }} className="w-full px-4 py-3 text-left text-red-400 hover:bg-red-500/10 flex items-center gap-3">
-                      <span className="material-symbols-outlined text-xl">delete</span>Delete
+                    <button
+                      onClick={() => { setShowDeleteModal(true); setShowMenu(false) }}
+                      className="w-full px-4 py-3 text-left text-red-400 hover:bg-red-500/10 flex items-center gap-3 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-xl">delete</span>
+                      Supprimer
                     </button>
                   </div>
                 </>
@@ -259,103 +365,144 @@ export default function ArtworkDetail() {
         </div>
       </header>
 
-      {/* Hero Image */}
-      <div className="relative h-[70vh] bg-black cursor-pointer group" onClick={() => artwork.image_url && setShowFullImage(true)}>
+      {/* Hero Image - 70vh */}
+      <div
+        className="relative h-[70vh] bg-black cursor-pointer group"
+        onClick={() => artwork.image_url && setShowFullImage(true)}
+      >
         {artwork.image_url ? (
-          <img src={artwork.image_url} alt={artwork.title} className="w-full h-full object-contain group-hover:scale-[1.02] transition-transform duration-700" />
+          <img
+            src={artwork.image_url}
+            alt={artwork.title}
+            className="w-full h-full object-contain group-hover:scale-[1.02] transition-transform duration-700"
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <span className="material-symbols-outlined text-8xl text-white/20">image</span>
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
+
+        {/* Zoom hint */}
+        {artwork.image_url && (
+          <div className="absolute bottom-4 right-4 flex items-center gap-2 text-white/50 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+            <span className="material-symbols-outlined text-lg">zoom_in</span>
+            Cliquez pour agrandir
+          </div>
+        )}
       </div>
 
-      {/* Title Section */}
+      {/* Title Section - overlapping hero */}
       <section className="relative -mt-32 z-10 text-center px-4 pb-12">
-        <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold italic text-white drop-shadow-lg mb-6">
+        <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-semibold italic text-white drop-shadow-lg mb-6">
           {artwork.title}
         </h1>
 
-        {/* Artist with gold lines */}
-        <div className="divider-text max-w-md mx-auto mb-8">
-          <span className="font-display italic text-xl text-white/90">
-            {artwork.artist || 'Unknown Artist'}
-            {artwork.artist_dates && <span className="text-white/50 ml-2">({artwork.artist_dates})</span>}
+        {/* Artist with gold accent lines */}
+        <div className="flex items-center justify-center gap-4 max-w-lg mx-auto mb-8">
+          <div className="flex-1 h-px bg-gradient-to-r from-transparent to-accent/50" />
+          <span className="font-serif italic text-xl text-white/90">
+            {artwork.artist || 'Artiste inconnu'}
+            {artwork.artist_dates && (
+              <span className="text-white/50 ml-2">({artwork.artist_dates})</span>
+            )}
           </span>
+          <div className="flex-1 h-px bg-gradient-to-l from-transparent to-accent/50" />
         </div>
 
         {/* Action buttons */}
         <div className="flex items-center justify-center gap-4">
-          <button onClick={shareArtwork} className="btn-outline bg-white/10 backdrop-blur-xl text-white border-white/20 hover:border-primary hover:text-primary flex items-center gap-2">
+          <button
+            onClick={shareArtwork}
+            className="btn btn-outline bg-white/10 backdrop-blur-xl text-white border-white/20 hover:border-accent hover:text-accent"
+          >
             <span className="material-symbols-outlined">share</span>
-            Share
-          </button>
-          <button onClick={() => window.print()} className="btn-outline bg-white/10 backdrop-blur-xl text-white border-white/20 hover:border-primary hover:text-primary flex items-center gap-2">
-            <span className="material-symbols-outlined">download</span>
-            Download
+            Partager
           </button>
         </div>
       </section>
 
-      {/* Content */}
+      {/* Content - Editorial layout */}
       <section className="max-w-6xl mx-auto px-4 py-12">
         <div className="grid md:grid-cols-3 gap-12">
-          {/* Left: Metadata */}
+          {/* Left column: Metadata */}
           <div className="space-y-8">
             {artwork.year && (
               <div>
-                <p className="text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-1">Year</p>
+                <p className="label mb-1">Année</p>
                 <p className="font-display text-2xl">{artwork.year}</p>
               </div>
             )}
+
             {artwork.medium && (
               <div>
-                <p className="text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-1">Medium</p>
-                <p className="font-display italic text-lg">{artwork.medium}</p>
+                <p className="label mb-1">Technique</p>
+                <p className="font-serif italic text-lg">{artwork.medium}</p>
               </div>
             )}
+
             {artwork.dimensions && (
               <div>
-                <p className="text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-1">Dimensions</p>
+                <p className="label mb-1">Dimensions</p>
                 <p className="text-lg">{artwork.dimensions}</p>
               </div>
             )}
+
             {artwork.museum && (
               <div>
-                <p className="text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-1">Location</p>
+                <p className="label mb-1">Localisation</p>
                 <p className="text-lg">{artwork.museum}</p>
                 {(artwork.museum_city || artwork.museum_country) && (
-                  <p className="text-black/50 dark:text-white/50">{[artwork.museum_city, artwork.museum_country].filter(Boolean).join(', ')}</p>
+                  <p className="text-secondary">
+                    {[artwork.museum_city, artwork.museum_country].filter(Boolean).join(', ')}
+                  </p>
                 )}
               </div>
             )}
+
+            {/* Period & Style tags */}
             {(artwork.period || artwork.style) && (
               <div className="flex flex-wrap gap-2">
                 {artwork.period && (
-                  <span className="px-3 py-1 text-xs uppercase tracking-widest border border-primary/30 text-primary">{artwork.period}</span>
+                  <span className="chip chip-accent">{artwork.period}</span>
                 )}
                 {artwork.style && (
-                  <span className="px-3 py-1 text-xs uppercase tracking-widest border border-black/20 dark:border-white/20">{artwork.style}</span>
+                  <span className="chip">{artwork.style}</span>
                 )}
               </div>
             )}
           </div>
 
-          {/* Right: Description */}
+          {/* Right columns: Description */}
           <div className="md:col-span-2 space-y-8">
             {artwork.description && (
               <div>
-                <p className="text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-4">About This Work</p>
-                <p className="drop-cap text-lg leading-relaxed font-body">{artwork.description}</p>
+                <p className="label mb-4">À propos de cette œuvre</p>
+                <p className="text-lg leading-relaxed font-serif first-letter:text-5xl first-letter:font-display first-letter:float-left first-letter:mr-3 first-letter:mt-1 first-letter:text-accent">
+                  {artwork.description}
+                </p>
               </div>
             )}
 
             {artwork.curatorial_note && (
-              <div className="editorial-quote py-6">
-                <p className="font-display italic text-xl leading-relaxed text-primary/90">
-                  {artwork.curatorial_note}
+              <blockquote className="border-l-2 border-accent pl-6 py-4">
+                <p className="font-display italic text-xl leading-relaxed text-accent">
+                  "{artwork.curatorial_note}"
                 </p>
+              </blockquote>
+            )}
+
+            {/* If no description, show a placeholder */}
+            {!artwork.description && !artwork.curatorial_note && (
+              <div className="text-center py-12 bg-secondary rounded-xl">
+                <span className="material-symbols-outlined text-4xl text-secondary mb-2">description</span>
+                <p className="text-secondary">Aucune description disponible</p>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="btn btn-outline mt-4"
+                >
+                  Ajouter une description
+                </button>
               </div>
             )}
           </div>
@@ -364,67 +511,60 @@ export default function ArtworkDetail() {
 
       {/* Related Works */}
       {relatedArtworks.length > 0 && (
-        <section className="max-w-6xl mx-auto px-4 py-12 border-t border-black/10 dark:border-white/10">
-          <h2 className="text-xs uppercase tracking-widest text-black/40 dark:text-white/40 mb-8">
-            More by {artwork.artist}
+        <section className="max-w-6xl mx-auto px-4 py-12 border-t border-primary/10">
+          <h2 className="label mb-8">
+            Autres œuvres de {artwork.artist}
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {relatedArtworks.map(related => (
-              <Link key={related.id} to={`/artwork/${related.id}`} className="group">
-                <div className="aspect-[4/5] bg-black/5 dark:bg-white/5 overflow-hidden mb-2">
-                  {related.image_url ? (
-                    <img src={related.image_url} alt={related.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <span className="material-symbols-outlined text-2xl text-black/20 dark:text-white/20">image</span>
-                    </div>
-                  )}
-                </div>
-                <p className="text-sm truncate group-hover:text-primary transition-colors">{related.title}</p>
-                {related.year && <p className="text-xs text-black/40 dark:text-white/40">{related.year}</p>}
-              </Link>
+              <ArtworkCard key={related.id} artwork={related} />
             ))}
           </div>
         </section>
       )}
 
       {/* Footer */}
-      <footer className="max-w-6xl mx-auto px-4 py-8 text-center">
-        <p className="text-sm text-black/30 dark:text-white/30">
-          Added {new Date(artwork.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+      <footer className="max-w-6xl mx-auto px-4 py-8 text-center border-t border-primary/10">
+        <p className="text-sm text-secondary">
+          Ajouté le {new Date(artwork.created_at).toLocaleDateString('fr-FR', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+          })}
         </p>
       </footer>
 
       {/* Full Image Modal */}
       {showFullImage && artwork.image_url && (
-        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center" onClick={() => setShowFullImage(false)}>
-          <button onClick={() => setShowFullImage(false)} className="absolute top-4 right-4 w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors z-10">
+        <div
+          className="fixed inset-0 bg-black z-50 flex items-center justify-center"
+          onClick={() => setShowFullImage(false)}
+        >
+          <button
+            onClick={() => setShowFullImage(false)}
+            className="absolute top-4 right-4 w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors z-10"
+          >
             <span className="material-symbols-outlined">close</span>
           </button>
-          <img src={artwork.image_url} alt={artwork.title} className="max-w-full max-h-full object-contain" />
+          <img
+            src={artwork.image_url}
+            alt={artwork.title}
+            className="max-w-full max-h-full object-contain"
+          />
         </div>
       )}
 
-      {/* Delete Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-          <div className="glass rounded-xl p-6 max-w-sm w-full">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
-                <span className="material-symbols-outlined text-3xl text-red-400">delete</span>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Delete this artwork?</h3>
-              <p className="text-black/60 dark:text-white/60">This action cannot be undone.</p>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setShowDeleteModal(false)} disabled={deleting} className="btn-outline flex-1 disabled:opacity-50">Cancel</button>
-              <button onClick={handleDelete} disabled={deleting} className="flex-1 bg-red-500 text-white font-semibold py-3 px-6 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50">
-                {deleting ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        title="Supprimer cette œuvre ?"
+        message="Cette action est irréversible. L'œuvre et son image seront définitivement supprimées."
+        confirmText={deleting ? 'Suppression...' : 'Supprimer'}
+        cancelText="Annuler"
+        danger
+      />
     </div>
   )
 }
