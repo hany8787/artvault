@@ -151,21 +151,24 @@ export default function Scan() {
 
       if (fnError) throw fnError
 
+      // API returns data in data.data (double nesting from Supabase)
+      const result = data.data || data
+
       // Use the real values from the API response
       const analysis = {
-        title: data.title || '',
-        artist: data.artist || '',
-        artist_dates: data.artist_dates || '',
-        year: data.year || '',
-        period: data.period || '',
-        style: data.style || '',
-        medium: data.medium || '',
-        dimensions: data.dimensions || '',
-        museum: data.museum || '',
-        museum_city: data.museum_city || '',
-        museum_country: data.museum_country || '',
-        description: data.description || '',
-        curatorial_note: data.curatorial_note || ''
+        title: result.title || '',
+        artist: result.artist || '',
+        artist_dates: result.artist_dates || '',
+        year: result.year || '',
+        period: result.period || '',
+        style: result.style || '',
+        medium: result.medium || '',
+        dimensions: result.dimensions || '',
+        museum: result.museum || '',
+        museum_city: result.museum_city || '',
+        museum_country: result.museum_country || '',
+        description: result.description || '',
+        curatorial_note: result.curatorial_note || ''
       }
 
       setFormData(analysis)
