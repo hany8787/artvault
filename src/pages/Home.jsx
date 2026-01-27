@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { ArtworkCard, MuseumCard, ExhibitionCard } from '../components/ui/Card'
+import { ArtworkCard, MuseumCard } from '../components/ui/Card'
 import { SkeletonCard } from '../components/ui/Loader'
 
 // Hero background - famous artwork
@@ -36,42 +36,18 @@ const FEATURED_MUSEUMS = [
   }
 ]
 
-// Sample exhibitions for preview
-const SAMPLE_EXHIBITIONS = [
-  {
-    id: 1,
-    title: 'L\'Impressionnisme et la Mode',
-    venue: 'Musée d\'Orsay',
-    date_start: '2026-01-15',
-    date_end: '2026-04-30',
-    image_url: 'https://images.unsplash.com/photo-1578321272176-b7bbc0679853?w=400&q=80'
-  },
-  {
-    id: 2,
-    title: 'Picasso. Tableaux Magiques',
-    venue: 'Musée Picasso',
-    date_start: '2026-02-01',
-    date_end: '2026-05-15',
-    image_url: 'https://images.unsplash.com/photo-1577083552431-6e5fd01988ec?w=400&q=80'
-  },
-  {
-    id: 3,
-    title: 'Les Années Pop',
-    venue: 'Centre Pompidou',
-    date_start: '2026-01-20',
-    date_end: '2026-06-01',
-    image_url: 'https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400&q=80'
-  }
-]
-
 export default function Home() {
   const { user, profile } = useAuth()
+  const navigate = useNavigate()
   const [recentArtworks, setRecentArtworks] = useState([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ total: 0, artists: 0, museums: 0 })
+  const [exhibitions, setExhibitions] = useState([])
+  const [exhibitionsLoading, setExhibitionsLoading] = useState(true)
 
   useEffect(() => {
     fetchData()
+    fetchExhibitions()
   }, [user])
 
   async function fetchData() {
@@ -121,6 +97,66 @@ export default function Home() {
     }
   }
 
+  async function fetchExhibitions() {
+    try {
+      const params = new URLSearchParams({
+        limit: '3',
+        refine: 'tags:exposition',
+        order_by: 'date_start DESC'
+      })
+
+      const response = await fetch(
+        `https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/que-faire-a-paris-/records?${params}`
+      )
+
+      if (!response.ok) throw new Error('API unavailable')
+
+      const data = await response.json()
+
+      const now = new Date()
+      const transformed = data.results
+        .filter(record => {
+          if (!record.date_end) return true
+          const endDate = new Date(record.date_end)
+          return endDate >= now
+        })
+        .slice(0, 3)
+        .map(record => ({
+          id: record.id,
+          title: record.title || 'Sans titre',
+          venue: record.address_name || record.address_street || 'Paris',
+          date_start: record.date_start,
+          date_end: record.date_end,
+          description: record.lead_text || record.description,
+          url: record.url,
+          image_url: record.cover_url || record.cover?.url,
+        }))
+
+      setExhibitions(transformed)
+    } catch (err) {
+      console.error('Error fetching exhibitions:', err)
+    } finally {
+      setExhibitionsLoading(false)
+    }
+  }
+
+  function formatDateRange(startDate, endDate) {
+    const options = { day: 'numeric', month: 'short' }
+
+    if (!startDate && !endDate) return ''
+
+    const start = startDate ? new Date(startDate) : null
+    const end = endDate ? new Date(endDate) : null
+
+    if (start && end) {
+      return `${start.toLocaleDateString('fr-FR', options)} - ${end.toLocaleDateString('fr-FR', options)}`
+    }
+
+    if (end) return `Jusqu'au ${end.toLocaleDateString('fr-FR', options)}`
+
+    return ''
+  }
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -166,8 +202,168 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How it works */}
+      {/* Recent artworks (if user has artworks) */}
+      {stats.total > 0 && (
+        <section className="py-20 px-4 bg-bg-light dark:bg-bg-dark">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="font-display text-3xl mb-2 text-primary dark:text-white">
+                  Récemment ajouté
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400">
+                  {stats.total} œuvre{stats.total > 1 ? 's' : ''} · {stats.artists} artiste{stats.artists > 1 ? 's' : ''} · {stats.museums} musée{stats.museums > 1 ? 's' : ''}
+                </p>
+              </div>
+              <Link to="/collection" className="btn btn-outline">
+                Voir tout
+              </Link>
+            </div>
+
+            {/* Artworks carousel */}
+            <div className="flex gap-6 overflow-x-auto pb-4 no-scrollbar">
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex-shrink-0 w-64">
+                    <SkeletonCard />
+                  </div>
+                ))
+              ) : (
+                recentArtworks.map((artwork) => (
+                  <div key={artwork.id} className="flex-shrink-0 w-64">
+                    <ArtworkCard artwork={artwork} />
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Empty state CTA (if no artworks) */}
+      {!loading && stats.total === 0 && (
+        <section className="py-20 px-4 bg-bg-light dark:bg-bg-dark">
+          <div className="max-w-xl mx-auto text-center">
+            <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-accent/10 flex items-center justify-center">
+              <span className="material-symbols-outlined text-5xl text-accent">add_photo_alternate</span>
+            </div>
+            <h2 className="font-display text-3xl mb-4 text-primary dark:text-white">
+              Commencez votre collection
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-8">
+              Scannez votre première œuvre d'art et commencez à constituer votre galerie personnelle
+            </p>
+            <Link to="/scan" className="btn btn-primary btn-lg">
+              <span className="material-symbols-outlined">photo_camera</span>
+              Scanner une œuvre
+            </Link>
+          </div>
+        </section>
+      )}
+
+      {/* Exhibitions - BEFORE Museums */}
+      <section className="py-20 px-4 bg-gray-50 dark:bg-gray-900/50">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="font-display text-3xl mb-2 text-primary dark:text-white">
+                Expositions en cours
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400">
+                Découvrez les expositions à Paris
+              </p>
+            </div>
+            <Link to="/news" className="btn btn-outline">
+              Voir tout
+            </Link>
+          </div>
+
+          {/* Exhibitions grid */}
+          {exhibitionsLoading ? (
+            <div className="grid md:grid-cols-3 gap-6">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          ) : exhibitions.length > 0 ? (
+            <div className="grid md:grid-cols-3 gap-6">
+              {exhibitions.map((exhibition) => (
+                <a
+                  key={exhibition.id}
+                  href={exhibition.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="card group overflow-hidden cursor-pointer"
+                >
+                  {/* Image */}
+                  <div className="aspect-[16/9] overflow-hidden bg-gray-100 dark:bg-gray-800">
+                    {exhibition.image_url ? (
+                      <img
+                        src={exhibition.image_url}
+                        alt={exhibition.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        onError={(e) => {
+                          e.target.onerror = null
+                          e.target.src = 'https://images.unsplash.com/photo-1578321272176-b7bbc0679853?w=400&q=80'
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-accent/10">
+                        <span className="material-symbols-outlined text-4xl text-accent/50">museum</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="p-4">
+                    <h3 className="font-display text-lg mb-1 line-clamp-2 text-primary dark:text-white group-hover:text-accent transition-colors">
+                      {exhibition.title}
+                    </h3>
+                    <p className="text-accent text-sm mb-1">{exhibition.venue}</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm">
+                      {formatDateRange(exhibition.date_start, exhibition.date_end)}
+                    </p>
+                  </div>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-gray-100 dark:bg-gray-800 rounded-xl">
+              <span className="material-symbols-outlined text-4xl text-gray-400 mb-2">event</span>
+              <p className="text-gray-600 dark:text-gray-400">Aucune exposition disponible</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Museums preview - AFTER Exhibitions */}
       <section className="py-20 px-4 bg-bg-light dark:bg-bg-dark">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="font-display text-3xl mb-2 text-primary dark:text-white">
+                Musées à découvrir
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400">
+                Explorez les plus grands musées du monde
+              </p>
+            </div>
+            <Link to="/museums" className="btn btn-outline">
+              Explorer les musées
+            </Link>
+          </div>
+
+          {/* Museums grid */}
+          <div className="grid md:grid-cols-3 gap-6">
+            {FEATURED_MUSEUMS.map((museum) => (
+              <MuseumCard key={museum.id} museum={museum} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How it works - AT THE END */}
+      <section className="py-20 px-4 bg-gray-50 dark:bg-gray-900/50">
         <div className="max-w-5xl mx-auto">
           <h2 className="font-display text-3xl md:text-4xl text-center mb-4 text-primary dark:text-white">
             Comment ça marche
@@ -210,119 +406,6 @@ export default function Home() {
                 Constituez votre collection personnelle d'œuvres d'art
               </p>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Recent artworks (if user has artworks) */}
-      {stats.total > 0 && (
-        <section className="py-20 px-4 bg-gray-50 dark:bg-gray-900/50">
-          <div className="max-w-6xl mx-auto">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="font-display text-3xl mb-2 text-primary dark:text-white">
-                  Récemment ajouté
-                </h2>
-                <p className="text-gray-600 dark:text-gray-400">
-                  {stats.total} œuvre{stats.total > 1 ? 's' : ''} · {stats.artists} artiste{stats.artists > 1 ? 's' : ''} · {stats.museums} musée{stats.museums > 1 ? 's' : ''}
-                </p>
-              </div>
-              <Link to="/collection" className="btn btn-outline">
-                Voir tout
-              </Link>
-            </div>
-
-            {/* Artworks carousel */}
-            <div className="flex gap-6 overflow-x-auto pb-4 no-scrollbar">
-              {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex-shrink-0 w-64">
-                    <SkeletonCard />
-                  </div>
-                ))
-              ) : (
-                recentArtworks.map((artwork) => (
-                  <div key={artwork.id} className="flex-shrink-0 w-64">
-                    <ArtworkCard artwork={artwork} />
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Empty state CTA (if no artworks) */}
-      {!loading && stats.total === 0 && (
-        <section className="py-20 px-4 bg-gray-50 dark:bg-gray-900/50">
-          <div className="max-w-xl mx-auto text-center">
-            <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-accent/10 flex items-center justify-center">
-              <span className="material-symbols-outlined text-5xl text-accent">add_photo_alternate</span>
-            </div>
-            <h2 className="font-display text-3xl mb-4 text-primary dark:text-white">
-              Commencez votre collection
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-8">
-              Scannez votre première œuvre d'art et commencez à constituer votre galerie personnelle
-            </p>
-            <Link to="/scan" className="btn btn-primary btn-lg">
-              <span className="material-symbols-outlined">photo_camera</span>
-              Scanner une œuvre
-            </Link>
-          </div>
-        </section>
-      )}
-
-      {/* Exhibitions preview */}
-      <section className="py-20 px-4 bg-bg-light dark:bg-bg-dark">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="font-display text-3xl mb-2 text-primary dark:text-white">
-                Expositions à Paris
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400">
-                Découvrez les expositions en cours dans les musées parisiens
-              </p>
-            </div>
-            <Link to="/news" className="btn btn-outline">
-              Voir toutes les expositions
-            </Link>
-          </div>
-
-          {/* Exhibitions carousel */}
-          <div className="flex gap-6 overflow-x-auto pb-4 no-scrollbar">
-            {SAMPLE_EXHIBITIONS.map((exhibition) => (
-              <div key={exhibition.id} className="flex-shrink-0 w-80">
-                <ExhibitionCard exhibition={exhibition} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Museums preview */}
-      <section className="py-20 px-4 bg-gray-50 dark:bg-gray-900/50">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="font-display text-3xl mb-2 text-primary dark:text-white">
-                Musées à découvrir
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400">
-                Explorez les plus grands musées du monde
-              </p>
-            </div>
-            <Link to="/museums" className="btn btn-outline">
-              Explorer les musées
-            </Link>
-          </div>
-
-          {/* Museums grid */}
-          <div className="grid md:grid-cols-3 gap-6">
-            {FEATURED_MUSEUMS.map((museum) => (
-              <MuseumCard key={museum.id} museum={museum} />
-            ))}
           </div>
         </div>
       </section>
