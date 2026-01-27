@@ -323,88 +323,15 @@ export default function ArtworkDetail() {
 
   return (
     <div className="min-h-screen">
-      {/* Floating Header */}
-      <header className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/50 to-transparent">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      {/* Simple Back Header */}
+      <header className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/70 to-transparent">
+        <div className="max-w-7xl mx-auto px-4 py-4">
           <button
             onClick={() => navigate(-1)}
-            className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+            className="w-11 h-11 bg-black/50 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-black/70 transition-colors border border-white/20"
           >
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
-
-          <div className="flex items-center gap-2">
-            {/* Favorite button */}
-            <button
-              onClick={toggleFavorite}
-              disabled={togglingFavorite}
-              className={`w-10 h-10 backdrop-blur-xl rounded-full flex items-center justify-center transition-all ${
-                artwork.is_favorite
-                  ? 'bg-red-500 text-white'
-                  : 'bg-white/10 text-white hover:bg-white/20'
-              }`}
-            >
-              <span className={`material-symbols-outlined ${artwork.is_favorite ? 'filled' : ''}`}>
-                favorite
-              </span>
-            </button>
-
-            {/* Theme toggle */}
-            <button
-              onClick={toggleTheme}
-              className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-            >
-              <span className="material-symbols-outlined">
-                {theme === 'dark' ? 'light_mode' : 'dark_mode'}
-              </span>
-            </button>
-
-            {/* Menu */}
-            <div className="relative">
-              <button
-                onClick={() => setShowMenu(!showMenu)}
-                className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-              >
-                <span className="material-symbols-outlined">more_vert</span>
-              </button>
-
-              {showMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-52 bg-black/80 backdrop-blur-xl rounded-xl overflow-hidden z-50 border border-white/10">
-                    <button
-                      onClick={() => { setIsEditing(true); setShowMenu(false) }}
-                      className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-xl">edit</span>
-                      Modifier
-                    </button>
-                    <button
-                      onClick={() => { setShowCollectionModal(true); setShowMenu(false) }}
-                      className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-xl">folder</span>
-                      Ajouter à une collection
-                    </button>
-                    <button
-                      onClick={shareArtwork}
-                      className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-xl">share</span>
-                      Partager
-                    </button>
-                    <button
-                      onClick={() => { setShowDeleteModal(true); setShowMenu(false) }}
-                      className="w-full px-4 py-3 text-left text-red-400 hover:bg-red-500/10 flex items-center gap-3 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-xl">delete</span>
-                      Supprimer
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
         </div>
       </header>
 
@@ -426,9 +353,88 @@ export default function ArtworkDetail() {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
 
+        {/* Action Bar - Fixed at bottom of hero image */}
+        <div className="absolute bottom-0 left-0 right-0 z-30" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-center gap-3 px-4 py-4 bg-black/70 backdrop-blur-md border-t border-white/10">
+            {/* Favorite */}
+            <button
+              onClick={toggleFavorite}
+              disabled={togglingFavorite}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium transition-all ${
+                artwork.is_favorite
+                  ? 'bg-red-500 text-white'
+                  : 'bg-white/15 text-white hover:bg-white/25 border border-white/20'
+              }`}
+            >
+              <span className={`material-symbols-outlined text-xl ${artwork.is_favorite ? 'filled' : ''}`}>
+                favorite
+              </span>
+              <span className="text-sm">{artwork.is_favorite ? 'Favori' : 'Ajouter'}</span>
+            </button>
+
+            {/* Edit */}
+            <button
+              onClick={() => setIsEditing(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/15 text-white hover:bg-white/25 border border-white/20 font-medium transition-all"
+            >
+              <span className="material-symbols-outlined text-xl">edit</span>
+              <span className="text-sm">Modifier</span>
+            </button>
+
+            {/* More Menu */}
+            <div className="relative">
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className="flex items-center justify-center w-11 h-11 rounded-full bg-white/15 text-white hover:bg-white/25 border border-white/20 transition-all"
+              >
+                <span className="material-symbols-outlined">more_horiz</span>
+              </button>
+
+              {showMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                  <div className="absolute right-0 bottom-full mb-2 w-52 bg-black/90 backdrop-blur-xl rounded-xl overflow-hidden z-50 border border-white/20 shadow-xl">
+                    <button
+                      onClick={() => { setShowCollectionModal(true); setShowMenu(false) }}
+                      className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-xl">folder</span>
+                      Ajouter à une collection
+                    </button>
+                    <button
+                      onClick={() => { shareArtwork(); setShowMenu(false) }}
+                      className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-xl">share</span>
+                      Partager
+                    </button>
+                    <button
+                      onClick={toggleTheme}
+                      className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-xl">
+                        {theme === 'dark' ? 'light_mode' : 'dark_mode'}
+                      </span>
+                      {theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+                    </button>
+                    <div className="border-t border-white/10" />
+                    <button
+                      onClick={() => { setShowDeleteModal(true); setShowMenu(false) }}
+                      className="w-full px-4 py-3 text-left text-red-400 hover:bg-red-500/10 flex items-center gap-3 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-xl">delete</span>
+                      Supprimer
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Zoom hint */}
         {artwork.image_url && (
-          <div className="absolute bottom-4 right-4 flex items-center gap-2 text-white/50 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute bottom-20 right-4 flex items-center gap-2 text-white/50 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
             <span className="material-symbols-outlined text-lg">zoom_in</span>
             Cliquez pour agrandir
           </div>

@@ -5,9 +5,6 @@ import { supabase } from '../lib/supabase'
 import { ArtworkCard, MuseumCard } from '../components/ui/Card'
 import { SkeletonCard } from '../components/ui/Loader'
 
-// Hero background - famous artwork
-const HERO_IMAGE = 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg/1280px-Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg'
-
 export default function Home() {
   const { user, profile } = useAuth()
   const [recentArtworks, setRecentArtworks] = useState([])
@@ -34,7 +31,7 @@ export default function Home() {
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(5)
+        .limit(6)
 
       setRecentArtworks(artworks || [])
 
@@ -73,7 +70,6 @@ export default function Home() {
 
   async function fetchExhibitions() {
     try {
-      // Direct fetch to Edge Function (supabase.functions.invoke has issues)
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
       
@@ -83,17 +79,15 @@ export default function Home() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${supabaseKey}`
         },
-        body: JSON.stringify({ limit: 3 })
+        body: JSON.stringify({ limit: 5 })
       })
 
       if (!response.ok) {
-        console.error('Edge function error:', response.status)
         setExhibitions([])
         return
       }
 
       const data = await response.json()
-      console.log('Exhibitions from Edge Function:', data)
       setExhibitions(data?.exhibitions || [])
     } catch (err) {
       console.error('Error fetching exhibitions:', err)
@@ -105,14 +99,12 @@ export default function Home() {
 
   async function fetchFeaturedMuseums() {
     try {
-      // Fetch real museums from Supabase
       const { data, error } = await supabase
         .from('museums')
         .select('*')
-        .limit(3)
+        .limit(4)
 
       if (error) {
-        console.error('Error fetching museums:', error)
         setFeaturedMuseums([])
         return
       }
@@ -128,233 +120,170 @@ export default function Home() {
 
   function formatDateRange(startDate, endDate) {
     const options = { day: 'numeric', month: 'short' }
-
     if (!startDate && !endDate) return ''
-
     const start = startDate ? new Date(startDate) : null
     const end = endDate ? new Date(endDate) : null
-
     if (start && end) {
       return `${start.toLocaleDateString('fr-FR', options)} - ${end.toLocaleDateString('fr-FR', options)}`
     }
-
     if (end) return `Jusqu'au ${end.toLocaleDateString('fr-FR', options)}`
-
     return ''
   }
 
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="relative h-screen flex items-center justify-center overflow-hidden">
-        {/* Background Image */}
-        <div className="absolute inset-0">
-          <img
-            src={HERO_IMAGE}
-            alt="The Starry Night"
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-bg-light dark:to-bg-dark" />
-        </div>
-
-        {/* Content */}
-        <div className="relative z-10 text-center px-4 max-w-3xl mx-auto">
-          {profile?.full_name && (
-            <p className="text-white/70 font-serif italic mb-4 animate-slide-up">
-              Bienvenue, {profile.full_name}
+    <div className="min-h-screen bg-bg-light dark:bg-bg-dark pb-24">
+      {/* Compact Hero - App Style */}
+      <section className="relative pt-6 pb-8 px-4 bg-gradient-to-b from-accent/10 to-transparent">
+        <div className="max-w-lg mx-auto">
+          {/* Greeting */}
+          <div className="mb-6">
+            <p className="text-sm text-secondary mb-1">
+              {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
             </p>
-          )}
-          <h1 className="font-display text-4xl md:text-6xl text-white mb-6 animate-slide-up">
-            Votre Collection Personnelle
-          </h1>
-          <p className="font-serif text-xl md:text-2xl text-white/80 mb-8 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-            Capturez, identifiez et collectionnez les œuvres qui vous inspirent
-          </p>
+            <h1 className="font-display text-2xl md:text-3xl text-primary dark:text-white">
+              Bonjour{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''} 👋
+            </h1>
+          </div>
+
+          {/* Scanner Card - Hero CTA */}
           <Link
             to="/scan"
-            className="btn btn-primary btn-lg animate-slide-up"
-            style={{ animationDelay: '0.2s' }}
+            className="block relative overflow-hidden rounded-2xl bg-gradient-to-br from-accent to-amber-600 p-6 shadow-lg shadow-accent/20 hover:shadow-xl hover:shadow-accent/30 transition-all group"
           >
-            <span className="material-symbols-outlined">photo_camera</span>
-            Commencer à scanner
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-2xl text-white">photo_camera</span>
+                </div>
+                <div>
+                  <h2 className="font-semibold text-lg text-white">Scanner une œuvre</h2>
+                  <p className="text-white/80 text-sm">Identifiez avec l'IA</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-white/90 text-sm">
+                <span>Commencer</span>
+                <span className="material-symbols-outlined text-lg group-hover:translate-x-1 transition-transform">arrow_forward</span>
+              </div>
+            </div>
+            {/* Decorative circles */}
+            <div className="absolute -right-6 -top-6 w-32 h-32 rounded-full bg-white/10" />
+            <div className="absolute -right-2 -bottom-8 w-24 h-24 rounded-full bg-white/5" />
           </Link>
         </div>
-
-        {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-pulse-soft">
-          <span className="material-symbols-outlined text-white/50 text-3xl">
-            keyboard_arrow_down
-          </span>
-        </div>
       </section>
 
-      {/* How it works - RIGHT AFTER HERO */}
-      <section className="py-20 px-4 bg-bg-light dark:bg-bg-dark">
-        <div className="max-w-5xl mx-auto">
-          <h2 className="font-display text-3xl md:text-4xl text-center mb-4 text-primary dark:text-white">
-            Comment ça marche
-          </h2>
-          <div className="divider-gold mx-auto mb-16" />
+      {/* Ma Collection - Quick Stats */}
+      <section className="px-4 py-6">
+        <div className="max-w-lg mx-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display text-xl text-primary dark:text-white">Ma Collection</h2>
+            <Link to="/collection" className="text-accent text-sm font-medium flex items-center gap-1">
+              Voir tout
+              <span className="material-symbols-outlined text-lg">chevron_right</span>
+            </Link>
+          </div>
 
-          <div className="grid md:grid-cols-3 gap-12 stagger-children">
-            {/* Step 1 */}
-            <div className="text-center">
-              <span className="font-display text-6xl text-accent opacity-30">01</span>
-              <div className="w-16 h-16 mx-auto my-4 rounded-full bg-accent/10 flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl text-accent">photo_camera</span>
-              </div>
-              <h3 className="font-display text-xl mb-2 text-primary dark:text-white">Photographiez</h3>
-              <p className="text-gray-600 dark:text-gray-300">
-                Capturez une œuvre lors de votre visite au musée
-              </p>
+          {/* Stats Cards - Horizontal scroll */}
+          <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar mb-4">
+            <Link to="/collection" className="flex-shrink-0 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 min-w-[120px]">
+              <span className="material-symbols-outlined text-2xl text-accent mb-2">collections</span>
+              <p className="text-2xl font-bold text-primary dark:text-white">{stats.total}</p>
+              <p className="text-xs text-secondary">œuvres</p>
+            </Link>
+            <div className="flex-shrink-0 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 min-w-[120px]">
+              <span className="material-symbols-outlined text-2xl text-purple-500 mb-2">palette</span>
+              <p className="text-2xl font-bold text-primary dark:text-white">{stats.artists}</p>
+              <p className="text-xs text-secondary">artistes</p>
             </div>
-
-            {/* Step 2 */}
-            <div className="text-center">
-              <span className="font-display text-6xl text-accent opacity-30">02</span>
-              <div className="w-16 h-16 mx-auto my-4 rounded-full bg-accent/10 flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl text-accent">auto_awesome</span>
-              </div>
-              <h3 className="font-display text-xl mb-2 text-primary dark:text-white">Identifiez</h3>
-              <p className="text-gray-600 dark:text-gray-300">
-                Notre IA reconnaît l'œuvre et enrichit les informations
-              </p>
-            </div>
-
-            {/* Step 3 */}
-            <div className="text-center">
-              <span className="font-display text-6xl text-accent opacity-30">03</span>
-              <div className="w-16 h-16 mx-auto my-4 rounded-full bg-accent/10 flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl text-accent">collections</span>
-              </div>
-              <h3 className="font-display text-xl mb-2 text-primary dark:text-white">Collectionnez</h3>
-              <p className="text-gray-600 dark:text-gray-300">
-                Constituez votre collection personnelle d'œuvres d'art
-              </p>
+            <div className="flex-shrink-0 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 min-w-[120px]">
+              <span className="material-symbols-outlined text-2xl text-blue-500 mb-2">museum</span>
+              <p className="text-2xl font-bold text-primary dark:text-white">{stats.museums}</p>
+              <p className="text-xs text-secondary">musées</p>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Recent artworks (if user has artworks) */}
-      {stats.total > 0 && (
-        <section className="py-20 px-4 bg-gray-50 dark:bg-gray-900/50">
-          <div className="max-w-6xl mx-auto">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="font-display text-3xl mb-2 text-primary dark:text-white">
-                  Récemment ajouté
-                </h2>
-                <p className="text-gray-600 dark:text-gray-400">
-                  {stats.total} œuvre{stats.total > 1 ? 's' : ''} · {stats.artists} artiste{stats.artists > 1 ? 's' : ''} · {stats.museums} musée{stats.museums > 1 ? 's' : ''}
-                </p>
-              </div>
-              <Link to="/collection" className="btn btn-outline">
-                Voir tout
+          {/* Recent Artworks - Horizontal scroll */}
+          {loading ? (
+            <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex-shrink-0 w-40">
+                  <SkeletonCard />
+                </div>
+              ))}
+            </div>
+          ) : recentArtworks.length > 0 ? (
+            <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
+              {recentArtworks.map((artwork) => (
+                <div key={artwork.id} className="flex-shrink-0 w-40">
+                  <ArtworkCard artwork={artwork} compact />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-surface-dark rounded-xl p-6 text-center border border-gray-100 dark:border-gray-800">
+              <span className="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-600 mb-2">add_photo_alternate</span>
+              <p className="text-secondary text-sm mb-3">Votre collection est vide</p>
+              <Link to="/scan" className="text-accent text-sm font-medium">
+                Scanner ma première œuvre →
               </Link>
             </div>
+          )}
+        </div>
+      </section>
 
-            {/* Artworks carousel */}
-            <div className="flex gap-6 overflow-x-auto pb-4 no-scrollbar">
-              {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex-shrink-0 w-64">
-                    <SkeletonCard />
-                  </div>
-                ))
-              ) : (
-                recentArtworks.map((artwork) => (
-                  <div key={artwork.id} className="flex-shrink-0 w-64">
-                    <ArtworkCard artwork={artwork} />
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Empty state CTA (if no artworks) */}
-      {!loading && stats.total === 0 && (
-        <section className="py-20 px-4 bg-gray-50 dark:bg-gray-900/50">
-          <div className="max-w-xl mx-auto text-center">
-            <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-accent/10 flex items-center justify-center">
-              <span className="material-symbols-outlined text-5xl text-accent">add_photo_alternate</span>
-            </div>
-            <h2 className="font-display text-3xl mb-4 text-primary dark:text-white">
-              Commencez votre collection
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-8">
-              Scannez votre première œuvre d'art et commencez à constituer votre galerie personnelle
-            </p>
-            <Link to="/scan" className="btn btn-primary btn-lg">
-              <span className="material-symbols-outlined">photo_camera</span>
-              Scanner une œuvre
-            </Link>
-          </div>
-        </section>
-      )}
-
-      {/* Exhibitions */}
-      <section className="py-20 px-4 bg-bg-light dark:bg-bg-dark">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="font-display text-3xl mb-2 text-primary dark:text-white">
-                Expositions en cours
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400">
-                Découvrez les expositions à Paris
-              </p>
-            </div>
-            <Link to="/news" className="btn btn-outline">
+      {/* Actualités / Expositions */}
+      <section className="px-4 py-6">
+        <div className="max-w-lg mx-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display text-xl text-primary dark:text-white">Actualités</h2>
+            <Link to="/news" className="text-accent text-sm font-medium flex items-center gap-1">
               Voir tout
+              <span className="material-symbols-outlined text-lg">chevron_right</span>
             </Link>
           </div>
 
-          {/* Exhibitions grid */}
+          {/* Exhibitions - Horizontal scroll cards */}
           {exhibitionsLoading ? (
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
               {Array.from({ length: 3 }).map((_, i) => (
-                <SkeletonCard key={i} />
+                <div key={i} className="flex-shrink-0 w-64">
+                  <SkeletonCard />
+                </div>
               ))}
             </div>
           ) : exhibitions.length > 0 ? (
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
               {exhibitions.map((exhibition) => (
                 <a
                   key={exhibition.id}
                   href={exhibition.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="card group overflow-hidden cursor-pointer"
+                  className="flex-shrink-0 w-64 bg-white dark:bg-surface-dark rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow group"
                 >
-                  {/* Image */}
-                  <div className="aspect-[16/9] overflow-hidden bg-gray-100 dark:bg-gray-800">
+                  <div className="aspect-[16/10] overflow-hidden bg-gray-100 dark:bg-gray-800">
                     {exhibition.image_url ? (
                       <img
                         src={exhibition.image_url}
                         alt={exhibition.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
                           e.target.onerror = null
                           e.target.src = 'https://images.unsplash.com/photo-1578321272176-b7bbc0679853?w=400&q=80'
                         }}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-accent/10">
-                        <span className="material-symbols-outlined text-4xl text-accent/50">museum</span>
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="material-symbols-outlined text-4xl text-gray-300">museum</span>
                       </div>
                     )}
                   </div>
-
-                  {/* Info */}
-                  <div className="p-4">
-                    <h3 className="font-display text-lg mb-1 line-clamp-2 text-primary dark:text-white group-hover:text-accent transition-colors">
+                  <div className="p-3">
+                    <h3 className="font-medium text-sm text-primary dark:text-white line-clamp-2 mb-1 group-hover:text-accent transition-colors">
                       {exhibition.title}
                     </h3>
-                    <p className="text-accent text-sm mb-1">{exhibition.venue}</p>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm">
+                    <p className="text-accent text-xs mb-0.5">{exhibition.venue}</p>
+                    <p className="text-secondary text-xs">
                       {formatDateRange(exhibition.date_start, exhibition.date_end)}
                     </p>
                   </div>
@@ -362,83 +291,113 @@ export default function Home() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 bg-gray-100 dark:bg-gray-800 rounded-xl">
-              <span className="material-symbols-outlined text-4xl text-gray-400 mb-2">event</span>
-              <p className="text-gray-600 dark:text-gray-400">Aucune exposition disponible</p>
+            <div className="bg-white dark:bg-surface-dark rounded-xl p-6 text-center border border-gray-100 dark:border-gray-800">
+              <span className="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-600 mb-2">event</span>
+              <p className="text-secondary text-sm">Aucune exposition disponible</p>
             </div>
           )}
         </div>
       </section>
 
-      {/* Museums preview */}
-      <section className="py-20 px-4 bg-gray-50 dark:bg-gray-900/50">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="font-display text-3xl mb-2 text-primary dark:text-white">
-                Musées à découvrir
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400">
-                Explorez les plus grands musées du monde
-              </p>
-            </div>
-            <Link to="/museums" className="btn btn-outline">
-              Explorer les musées
+      {/* Musées à découvrir */}
+      <section className="px-4 py-6">
+        <div className="max-w-lg mx-auto">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display text-xl text-primary dark:text-white">Musées</h2>
+            <Link to="/museums" className="text-accent text-sm font-medium flex items-center gap-1">
+              Explorer
+              <span className="material-symbols-outlined text-lg">chevron_right</span>
             </Link>
           </div>
 
-          {/* Museums grid */}
+          {/* Museums - Horizontal scroll */}
           {museumsLoading ? (
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
               {Array.from({ length: 3 }).map((_, i) => (
-                <SkeletonCard key={i} />
+                <div key={i} className="flex-shrink-0 w-48">
+                  <SkeletonCard />
+                </div>
               ))}
             </div>
           ) : featuredMuseums.length > 0 ? (
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
               {featuredMuseums.map((museum) => (
-                <MuseumCard key={museum.id} museum={museum} />
+                <Link
+                  key={museum.id}
+                  to={`/museums/${museum.id}`}
+                  className="flex-shrink-0 w-48 bg-white dark:bg-surface-dark rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow group"
+                >
+                  <div className="aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
+                    {museum.image_url ? (
+                      <img
+                        src={museum.image_url}
+                        alt={museum.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-accent/10">
+                        <span className="material-symbols-outlined text-3xl text-accent/50">museum</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <h3 className="font-medium text-sm text-primary dark:text-white line-clamp-1 mb-0.5">
+                      {museum.name}
+                    </h3>
+                    <p className="text-secondary text-xs">
+                      {museum.city}{museum.country ? `, ${museum.country}` : ''}
+                    </p>
+                  </div>
+                </Link>
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 bg-gray-100 dark:bg-gray-800 rounded-xl">
-              <span className="material-symbols-outlined text-4xl text-gray-400 mb-2">museum</span>
-              <p className="text-gray-600 dark:text-gray-400">Découvrez nos musées</p>
-              <Link to="/museums" className="btn btn-primary mt-4">
-                Voir tous les musées
+            <div className="bg-white dark:bg-surface-dark rounded-xl p-6 text-center border border-gray-100 dark:border-gray-800">
+              <span className="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-600 mb-2">museum</span>
+              <p className="text-secondary text-sm mb-3">Découvrez les musées</p>
+              <Link to="/museums" className="text-accent text-sm font-medium">
+                Explorer →
               </Link>
             </div>
           )}
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 px-4 border-t border-gray-200 dark:border-gray-800 bg-bg-light dark:bg-bg-dark">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            {/* Logo */}
-            <span className="font-display text-2xl italic text-accent">ArtVault</span>
+      {/* Comment ça marche - Compact */}
+      <section className="px-4 py-6">
+        <div className="max-w-lg mx-auto">
+          <h2 className="font-display text-xl text-primary dark:text-white mb-4 text-center">Comment ça marche</h2>
+          
+          <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
+            {/* Step 1 */}
+            <div className="flex-shrink-0 w-40 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 text-center">
+              <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-accent/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-xl text-accent">photo_camera</span>
+              </div>
+              <h3 className="font-medium text-sm text-primary dark:text-white mb-1">Photographiez</h3>
+              <p className="text-xs text-secondary">Capturez l'œuvre</p>
+            </div>
 
-            {/* Links */}
-            <nav className="flex gap-8 text-sm">
-              <a href="#" className="text-gray-600 dark:text-gray-400 hover:text-accent transition-colors">
-                À propos
-              </a>
-              <a href="#" className="text-gray-600 dark:text-gray-400 hover:text-accent transition-colors">
-                Contact
-              </a>
-              <a href="#" className="text-gray-600 dark:text-gray-400 hover:text-accent transition-colors">
-                Mentions légales
-              </a>
-            </nav>
+            {/* Step 2 */}
+            <div className="flex-shrink-0 w-40 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 text-center">
+              <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                <span className="material-symbols-outlined text-xl text-purple-500">auto_awesome</span>
+              </div>
+              <h3 className="font-medium text-sm text-primary dark:text-white mb-1">Identifiez</h3>
+              <p className="text-xs text-secondary">L'IA reconnaît</p>
+            </div>
 
-            {/* Copyright */}
-            <p className="text-gray-600 dark:text-gray-400 text-sm">
-              © 2026 ArtVault
-            </p>
+            {/* Step 3 */}
+            <div className="flex-shrink-0 w-40 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 text-center">
+              <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <span className="material-symbols-outlined text-xl text-blue-500">collections</span>
+              </div>
+              <h3 className="font-medium text-sm text-primary dark:text-white mb-1">Collectionnez</h3>
+              <p className="text-xs text-secondary">Votre galerie</p>
+            </div>
           </div>
         </div>
-      </footer>
+      </section>
     </div>
   )
 }

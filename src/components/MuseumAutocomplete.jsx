@@ -104,16 +104,16 @@ export default function MuseumAutocomplete({
 
       {/* Suggestions dropdown */}
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-surface border border-default rounded-lg overflow-hidden max-h-64 overflow-y-auto shadow-xl">
+        <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl overflow-hidden max-h-64 overflow-y-auto shadow-2xl">
           {suggestions.map(museum => (
             <button
               key={museum.id}
               type="button"
               onClick={() => handleSelectMuseum(museum)}
-              className="w-full px-4 py-3 text-left hover:bg-black/5 dark:hover:bg-white/10 transition-colors border-b border-default last:border-0"
+              className="w-full px-4 py-3 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors border-b border-neutral-100 dark:border-neutral-800 last:border-0"
             >
-              <div className="font-medium">{museum.name}</div>
-              <div className="text-secondary text-sm">
+              <div className="font-semibold text-neutral-900 dark:text-white">{museum.name}</div>
+              <div className="text-neutral-500 dark:text-neutral-400 text-sm mt-0.5">
                 {[museum.city, museum.country].filter(Boolean).join(', ')}
               </div>
             </button>
@@ -123,7 +123,7 @@ export default function MuseumAutocomplete({
 
       {/* No results message */}
       {showSuggestions && query.length >= 2 && suggestions.length === 0 && !loading && (
-        <div className="absolute z-50 w-full mt-1 bg-surface border border-default rounded-lg p-4 text-secondary text-sm shadow-xl">
+        <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl p-4 text-neutral-500 dark:text-neutral-400 text-sm shadow-2xl">
           Aucun musée trouvé. Le nom sera enregistré tel quel.
         </div>
       )}
