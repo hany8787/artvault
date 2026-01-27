@@ -11,6 +11,7 @@ export default function MuseumDetail() {
   const [museum, setMuseum] = useState(null)
   const [artworks, setArtworks] = useState([])
   const [exhibitions, setExhibitions] = useState([])
+  const [manualExhibitions, setManualExhibitions] = useState([])
   const [loadingExhibitions, setLoadingExhibitions] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -22,7 +23,8 @@ export default function MuseumDetail() {
   // Fetch exhibitions when museum is loaded
   useEffect(() => {
     if (museum) {
-      fetchExhibitions()
+      fetchManualExhibitions()
+      fetchApiExhibitions()
     }
   }, [museum])
 
@@ -52,8 +54,24 @@ export default function MuseumDetail() {
     setArtworks(data || [])
   }
 
-  async function fetchExhibitions() {
-    // Only fetch from API for Paris museums
+  // Fetch exhibitions from our Supabase table (manual + imported)
+  async function fetchManualExhibitions() {
+    const today = new Date().toISOString().split('T')[0]
+    
+    const { data, error } = await supabase
+      .from('museum_exhibitions')
+      .select('*')
+      .eq('museum_id', id)
+      .or(`date_end.gte.${today},date_end.is.null`)
+      .order('date_start', { ascending: true })
+
+    if (!error && data) {
+      setManualExhibitions(data)
+    }
+  }
+
+  // Fetch exhibitions from Paris API (for Paris museums only)
+  async function fetchApiExhibitions() {
     const isParis = museum.city?.toLowerCase().includes('paris')
     if (!isParis) return
 
@@ -72,25 +90,23 @@ export default function MuseumDetail() {
         const stopWords = ['musée', 'museum', 'de', 'du', 'la', 'le', 'les', 'd', 'l', 'des', 'centre', 'national', 'paris']
         const museumWords = museum.name
           .toLowerCase()
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
           .split(/[\s\-']+/)
           .filter(word => word.length > 2 && !stopWords.includes(word))
 
-        const matched = data.data.filter(expo => {
-          // Check if exhibition is current or future
+        const exhibitions = data.data || data.exhibitions || []
+        const matched = exhibitions.filter(expo => {
           if (expo.date_end) {
             const endDate = new Date(expo.date_end)
             if (endDate < now) return false
           }
 
-          // Match by venue, address, title, or description
           const venue = (expo.venue || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
           const address = (expo.address || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
           const title = (expo.title || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
           const description = (expo.description || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
           const searchText = venue + ' ' + address + ' ' + title + ' ' + description
           
-          // Check if any keyword from museum name appears
           return museumWords.some(word => searchText.includes(word))
         })
 
@@ -139,6 +155,32 @@ export default function MuseumDetail() {
   }
 
   const isParis = museum.city?.toLowerCase().includes('paris')
+  
+  // Combine manual exhibitions + API exhibitions (deduplicate by title)
+  const allExhibitions = [...manualExhibitions]
+  exhibitions.forEach(apiExpo => {
+    const exists = allExhibitions.some(e => 
+      e.title?.toLowerCase().trim() === apiExpo.title?.toLowerCase().trim()
+    )
+    if (!exists) {
+      allExhibitions.push({
+        id: apiExpo.id,
+        title: apiExpo.title,
+        description: apiExpo.description,
+        date_start: apiExpo.date_start,
+        date_end: apiExpo.date_end,
+        image_url: apiExpo.image_url,
+        url: apiExpo.url,
+        is_free: apiExpo.is_free,
+        source: 'api'
+      })
+    }
+  })
+
+  // Check if museum is marked as closed (from manual exhibitions)
+  const closureNotice = manualExhibitions.find(e => 
+    e.tags?.includes('fermeture') || e.tags?.includes('travaux')
+  )
 
   return (
     <div className="min-h-screen pb-24">
@@ -174,6 +216,21 @@ export default function MuseumDetail() {
 
           {museum.address && (
             <p className="text-secondary mb-4">{museum.address}</p>
+          )}
+
+          {/* Closure notice */}
+          {closureNotice && (
+            <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+              <div className="flex items-start gap-3">
+                <span className="material-symbols-outlined text-amber-500">warning</span>
+                <div>
+                  <p className="font-medium text-amber-500">{closureNotice.title}</p>
+                  {closureNotice.description && (
+                    <p className="text-sm text-secondary mt-1">{closureNotice.description}</p>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Quick info */}
@@ -225,81 +282,79 @@ export default function MuseumDetail() {
         <div className="mb-8">
           <h2 className="font-display text-2xl italic mb-4">Expositions en cours</h2>
 
-          {isParis ? (
-            // Paris museums: show exhibitions from API
-            loadingExhibitions ? (
-              <div className="text-center py-8">
-                <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                <p className="text-secondary text-sm">Recherche des expositions...</p>
-              </div>
-            ) : exhibitions.length > 0 ? (
-              <div className="space-y-4">
-                {exhibitions.map((expo) => (
-                  <a
-                    key={expo.id}
-                    href={expo.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block bg-secondary rounded-xl overflow-hidden hover:ring-2 hover:ring-accent transition-all"
-                  >
-                    <div className="flex gap-4">
-                      {expo.image_url && (
-                        <div className="w-24 h-24 flex-shrink-0">
-                          <img
-                            src={expo.image_url}
-                            alt={expo.title}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-                      <div className="flex-1 py-3 pr-4">
-                        <h3 className="font-medium line-clamp-2 mb-1">{expo.title}</h3>
-                        <p className="text-secondary text-sm">
-                          {formatDateRange(expo.date_start, expo.date_end)}
-                        </p>
+          {loadingExhibitions && manualExhibitions.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+              <p className="text-secondary text-sm">Recherche des expositions...</p>
+            </div>
+          ) : allExhibitions.filter(e => !e.tags?.includes('fermeture')).length > 0 ? (
+            <div className="space-y-4">
+              {allExhibitions
+                .filter(e => !e.tags?.includes('fermeture'))
+                .map((expo) => (
+                <a
+                  key={expo.id}
+                  href={expo.url || museum.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block bg-secondary rounded-xl overflow-hidden hover:ring-2 hover:ring-accent transition-all"
+                >
+                  <div className="flex gap-4">
+                    {expo.image_url && (
+                      <div className="w-24 h-24 flex-shrink-0">
+                        <img
+                          src={expo.image_url}
+                          alt={expo.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => e.target.style.display = 'none'}
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1 py-3 pr-4">
+                      <h3 className="font-medium line-clamp-2 mb-1">{expo.title}</h3>
+                      <p className="text-secondary text-sm">
+                        {formatDateRange(expo.date_start, expo.date_end)}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
                         {expo.is_free && (
-                          <span className="inline-block mt-1 px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded">
+                          <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded">
                             Gratuit
+                          </span>
+                        )}
+                        {expo.source === 'api' && (
+                          <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded">
+                            API Paris
+                          </span>
+                        )}
+                        {expo.source === 'manual' && (
+                          <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 text-xs rounded">
+                            Vérifié
                           </span>
                         )}
                       </div>
                     </div>
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 bg-secondary rounded-xl">
-                <span className="material-symbols-outlined text-3xl text-secondary mb-2">event</span>
-                <p className="text-secondary">Aucune exposition trouvée pour ce musée</p>
-                {museum.website && (
-                  <a
-                    href={museum.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-accent text-sm mt-2 hover:underline"
-                  >
-                    Voir le site officiel
-                    <span className="material-symbols-outlined text-sm">open_in_new</span>
-                  </a>
-                )}
-              </div>
-            )
+                  </div>
+                </a>
+              ))}
+            </div>
           ) : (
-            // Non-Paris museums: link to official website
             <div className="text-center py-8 bg-secondary rounded-xl">
-              <span className="material-symbols-outlined text-3xl text-secondary mb-2">language</span>
-              <p className="text-secondary mb-3">
-                Consultez les expositions sur le site officiel
+              <span className="material-symbols-outlined text-3xl text-secondary mb-2">event</span>
+              <p className="text-secondary">
+                {closureNotice 
+                  ? 'Musée actuellement fermé'
+                  : 'Aucune exposition trouvée pour ce musée'
+                }
               </p>
-              {museum.website && (
+              {museum.website && !closureNotice && (
                 <a
                   href={museum.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn btn-outline"
+                  className="inline-flex items-center gap-1 text-accent text-sm mt-2 hover:underline"
                 >
-                  Voir les expositions
-                  <span className="material-symbols-outlined text-lg">open_in_new</span>
+                  Voir le site officiel
+                  <span className="material-symbols-outlined text-sm">open_in_new</span>
                 </a>
               )}
             </div>

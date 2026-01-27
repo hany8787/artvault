@@ -73,17 +73,26 @@ export default function Home() {
 
   async function fetchExhibitions() {
     try {
-      // Use Supabase Edge Function to avoid CORS issues
-      const { data, error } = await supabase.functions.invoke('get-exhibitions', {
-        body: { limit: 3 }
+      // Direct fetch to Edge Function (supabase.functions.invoke has issues)
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/get-exhibitions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseKey}`
+        },
+        body: JSON.stringify({ limit: 3 })
       })
 
-      if (error) {
-        console.error('Edge function error:', error)
+      if (!response.ok) {
+        console.error('Edge function error:', response.status)
         setExhibitions([])
         return
       }
 
+      const data = await response.json()
       console.log('Exhibitions from Edge Function:', data)
       setExhibitions(data?.exhibitions || [])
     } catch (err) {

@@ -73,7 +73,8 @@ export default function News() {
       const now = new Date()
       now.setHours(0, 0, 0, 0) // Start of today
       
-      const filtered = data.data.filter(expo => {
+      const exhibitions = data.data || data.exhibitions || []
+      const filtered = exhibitions.filter(expo => {
         // If no end date, check start date
         if (!expo.date_end) {
           if (!expo.date_start) return true // No dates = keep it
