@@ -31,9 +31,10 @@ export function FavoriteButton({
     
     if (isLoading) return
     
-    // Optimistic update - met à jour l'UI immédiatement
+    // Optimistic update - met à jour l'UI ET le parent immédiatement
     const newValue = !isFavorite
     setIsFavorite(newValue)
+    onToggle?.(newValue) // Appeler le parent AVANT la requête DB
     setIsLoading(true)
 
     try {
@@ -45,10 +46,9 @@ export function FavoriteButton({
       if (error) {
         // Rollback en cas d'erreur
         setIsFavorite(!newValue)
+        onToggle?.(!newValue) // Rollback le parent aussi
         throw error
       }
-
-      onToggle?.(newValue)
     } catch (err) {
       console.error('Erreur toggle favori:', err)
     } finally {

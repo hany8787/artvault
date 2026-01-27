@@ -479,7 +479,7 @@ export default function Scan() {
 
   // FORM VIEW
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen pb-32">
       {/* Header */}
       <header className="sticky top-0 z-40 glass border-b border-default">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">

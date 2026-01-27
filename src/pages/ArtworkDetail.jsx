@@ -9,6 +9,7 @@ import Loader from '../components/ui/Loader'
 import { ArtworkCard } from '../components/ui/Card'
 import MuseumAutocomplete from '../components/MuseumAutocomplete'
 import SuggestionInput from '../components/ui/SuggestionInput'
+import AddToCollectionModal from '../components/ui/AddToCollectionModal'
 
 export default function ArtworkDetail() {
   const { id } = useParams()
@@ -27,6 +28,7 @@ export default function ArtworkDetail() {
   const [showFullImage, setShowFullImage] = useState(false)
   const [relatedArtworks, setRelatedArtworks] = useState([])
   const [togglingFavorite, setTogglingFavorite] = useState(false)
+  const [showCollectionModal, setShowCollectionModal] = useState(false)
 
   useEffect(() => {
     fetchArtwork()
@@ -103,33 +105,48 @@ export default function ArtworkDetail() {
   }
 
   async function handleSave() {
-    if (!editForm.title?.trim()) return
+    if (!editForm.title?.trim()) {
+      alert('Le titre est requis')
+      return
+    }
     setSaving(true)
     try {
       // Convert year to integer or null
       const yearValue = editForm.year ? parseInt(editForm.year, 10) : null
       const validYear = !isNaN(yearValue) ? yearValue : null
 
-      const { error } = await supabase
+      const updateData = {
+        title: editForm.title?.trim() || null,
+        artist: editForm.artist?.trim() || null,
+        artist_dates: editForm.artist_dates?.trim() || null,
+        year: validYear,
+        period: editForm.period?.trim() || null,
+        style: editForm.style?.trim() || null,
+        medium: editForm.medium?.trim() || null,
+        dimensions: editForm.dimensions?.trim() || null,
+        museum: editForm.museum?.trim() || null,
+        museum_city: editForm.museum_city?.trim() || null,
+        museum_country: editForm.museum_country?.trim() || null,
+        description: editForm.description?.trim() || null,
+        curatorial_note: editForm.curatorial_note?.trim() || null
+      }
+
+      const { data, error } = await supabase
         .from('artworks')
-        .update({
-          title: editForm.title?.trim() || null,
-          artist: editForm.artist?.trim() || null,
-          artist_dates: editForm.artist_dates?.trim() || null,
-          year: validYear,
-          period: editForm.period?.trim() || null,
-          style: editForm.style?.trim() || null,
-          medium: editForm.medium?.trim() || null,
-          dimensions: editForm.dimensions?.trim() || null,
-          museum: editForm.museum?.trim() || null,
-          museum_city: editForm.museum_city?.trim() || null,
-          museum_country: editForm.museum_country?.trim() || null,
-          description: editForm.description?.trim() || null,
-          curatorial_note: editForm.curatorial_note?.trim() || null
-        })
+        .update(updateData)
         .eq('id', id)
-      if (error) throw error
-      setArtwork({ ...artwork, ...editForm, year: validYear })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Save error:', error)
+        alert('Erreur lors de la sauvegarde: ' + error.message)
+        throw error
+      }
+      
+      // Update local state with saved data
+      setArtwork(data)
+      setEditForm(data)
       setIsEditing(false)
     } catch (err) {
       console.error('Save error:', err)
@@ -360,6 +377,13 @@ export default function ArtworkDetail() {
                     >
                       <span className="material-symbols-outlined text-xl">edit</span>
                       Modifier
+                    </button>
+                    <button
+                      onClick={() => { setShowCollectionModal(true); setShowMenu(false) }}
+                      className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-xl">folder</span>
+                      Ajouter à une collection
                     </button>
                     <button
                       onClick={shareArtwork}
@@ -650,6 +674,17 @@ export default function ArtworkDetail() {
         confirmText={deleting ? 'Suppression...' : 'Supprimer'}
         cancelText="Annuler"
         danger
+      />
+
+      {/* Add to Collection Modal */}
+      <AddToCollectionModal
+        isOpen={showCollectionModal}
+        onClose={() => setShowCollectionModal(false)}
+        artworkId={id}
+        currentCollectionId={artwork.collection_id}
+        onSuccess={(collectionId) => {
+          setArtwork(prev => ({ ...prev, collection_id: collectionId }))
+        }}
       />
     </div>
   )

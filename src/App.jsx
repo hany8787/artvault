@@ -7,6 +7,7 @@ import { PageLoader } from './components/ui/Loader'
 // Pages
 import Home from './pages/Home'
 import Collection from './pages/Collection'
+import Collections from './pages/Collections'
 import Scan from './pages/Scan'
 import Profile from './pages/Profile'
 import Login from './pages/Login'
@@ -48,6 +49,7 @@ function App() {
           }>
             <Route index element={<Home />} />
             <Route path="collection" element={<Collection />} />
+            <Route path="collections" element={<Collections />} />
             <Route path="scan" element={<Scan />} />
             <Route path="profile" element={<Profile />} />
             <Route path="artwork/:id" element={<ArtworkDetail />} />
