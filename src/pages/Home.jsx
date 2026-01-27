@@ -8,34 +8,6 @@ import { SkeletonCard } from '../components/ui/Loader'
 // Hero background - famous artwork
 const HERO_IMAGE = 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg/1280px-Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg'
 
-// Featured museums for preview
-const FEATURED_MUSEUMS = [
-  {
-    id: 'louvre',
-    name: 'Musée du Louvre',
-    city: 'Paris',
-    country: 'France',
-    description: 'Le plus grand musée d\'art du monde',
-    image_url: 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?w=400&q=80'
-  },
-  {
-    id: 'orsay',
-    name: 'Musée d\'Orsay',
-    city: 'Paris',
-    country: 'France',
-    description: 'Art impressionniste et post-impressionniste',
-    image_url: 'https://images.unsplash.com/photo-1591289009723-aef0a1a8a211?w=400&q=80'
-  },
-  {
-    id: 'pompidou',
-    name: 'Centre Pompidou',
-    city: 'Paris',
-    country: 'France',
-    description: 'Art moderne et contemporain',
-    image_url: 'https://images.unsplash.com/photo-1551866442-64e75e911c23?w=400&q=80'
-  }
-]
-
 export default function Home() {
   const { user, profile } = useAuth()
   const [recentArtworks, setRecentArtworks] = useState([])
@@ -43,10 +15,13 @@ export default function Home() {
   const [stats, setStats] = useState({ total: 0, artists: 0, museums: 0 })
   const [exhibitions, setExhibitions] = useState([])
   const [exhibitionsLoading, setExhibitionsLoading] = useState(true)
+  const [featuredMuseums, setFeaturedMuseums] = useState([])
+  const [museumsLoading, setMuseumsLoading] = useState(true)
 
   useEffect(() => {
     fetchData()
     fetchExhibitions()
+    fetchFeaturedMuseums()
   }, [user])
 
   async function fetchData() {
@@ -98,53 +73,47 @@ export default function Home() {
 
   async function fetchExhibitions() {
     try {
-      // API Que Faire à Paris - correct URL format
-      const url = 'https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/que-faire-a-paris-/records?limit=10&refine=tags%3Aexposition'
+      // Use Supabase Edge Function to avoid CORS issues
+      const { data, error } = await supabase.functions.invoke('get-exhibitions', {
+        body: { limit: 3 }
+      })
 
-      console.log('Fetching exhibitions from:', url)
-
-      const response = await fetch(url)
-
-      if (!response.ok) {
-        console.error('API response not ok:', response.status)
-        throw new Error('API unavailable')
-      }
-
-      const data = await response.json()
-      console.log('API response:', data)
-
-      if (!data.results || data.results.length === 0) {
-        console.log('No results from API')
+      if (error) {
+        console.error('Edge function error:', error)
         setExhibitions([])
         return
       }
 
-      const now = new Date()
-      const transformed = data.results
-        .filter(record => {
-          if (!record.date_end) return true
-          const endDate = new Date(record.date_end)
-          return endDate >= now
-        })
-        .slice(0, 3)
-        .map(record => ({
-          id: record.id || Math.random().toString(),
-          title: record.title || 'Sans titre',
-          venue: record.address_name || record.address_street || 'Paris',
-          date_start: record.date_start,
-          date_end: record.date_end,
-          description: record.lead_text || record.description,
-          url: record.url,
-          image_url: record.cover_url || record.cover?.url,
-        }))
-
-      console.log('Transformed exhibitions:', transformed)
-      setExhibitions(transformed)
+      console.log('Exhibitions from Edge Function:', data)
+      setExhibitions(data?.exhibitions || [])
     } catch (err) {
       console.error('Error fetching exhibitions:', err)
       setExhibitions([])
     } finally {
       setExhibitionsLoading(false)
+    }
+  }
+
+  async function fetchFeaturedMuseums() {
+    try {
+      // Fetch real museums from Supabase
+      const { data, error } = await supabase
+        .from('museums')
+        .select('*')
+        .limit(3)
+
+      if (error) {
+        console.error('Error fetching museums:', error)
+        setFeaturedMuseums([])
+        return
+      }
+
+      setFeaturedMuseums(data || [])
+    } catch (err) {
+      console.error('Error fetching featured museums:', err)
+      setFeaturedMuseums([])
+    } finally {
+      setMuseumsLoading(false)
     }
   }
 
@@ -410,11 +379,27 @@ export default function Home() {
           </div>
 
           {/* Museums grid */}
-          <div className="grid md:grid-cols-3 gap-6">
-            {FEATURED_MUSEUMS.map((museum) => (
-              <MuseumCard key={museum.id} museum={museum} />
-            ))}
-          </div>
+          {museumsLoading ? (
+            <div className="grid md:grid-cols-3 gap-6">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          ) : featuredMuseums.length > 0 ? (
+            <div className="grid md:grid-cols-3 gap-6">
+              {featuredMuseums.map((museum) => (
+                <MuseumCard key={museum.id} museum={museum} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-gray-100 dark:bg-gray-800 rounded-xl">
+              <span className="material-symbols-outlined text-4xl text-gray-400 mb-2">museum</span>
+              <p className="text-gray-600 dark:text-gray-400">Découvrez nos musées</p>
+              <Link to="/museums" className="btn btn-primary mt-4">
+                Voir tous les musées
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
