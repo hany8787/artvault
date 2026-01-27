@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
 /**
@@ -14,6 +14,11 @@ export function FavoriteButton({
   const [isFavorite, setIsFavorite] = useState(initialFavorite)
   const [isLoading, setIsLoading] = useState(false)
 
+  // Sync avec la prop parent quand elle change
+  useEffect(() => {
+    setIsFavorite(initialFavorite)
+  }, [initialFavorite])
+
   const sizeClasses = {
     sm: 'text-xl p-1',
     md: 'text-2xl p-2',
@@ -21,13 +26,15 @@ export function FavoriteButton({
   }
 
   const handleToggle = async (e) => {
-    e.preventDefault() // Empêche la navigation si dans un Link
+    e.preventDefault()
     e.stopPropagation()
     
     if (isLoading) return
     
-    setIsLoading(true)
+    // Optimistic update - met à jour l'UI immédiatement
     const newValue = !isFavorite
+    setIsFavorite(newValue)
+    setIsLoading(true)
 
     try {
       const { error } = await supabase
@@ -35,9 +42,12 @@ export function FavoriteButton({
         .update({ is_favorite: newValue })
         .eq('id', artworkId)
 
-      if (error) throw error
+      if (error) {
+        // Rollback en cas d'erreur
+        setIsFavorite(!newValue)
+        throw error
+      }
 
-      setIsFavorite(newValue)
       onToggle?.(newValue)
     } catch (err) {
       console.error('Erreur toggle favori:', err)
