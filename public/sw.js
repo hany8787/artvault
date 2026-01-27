@@ -1,21 +1,21 @@
-const CACHE_NAME = 'artvault-v1';
+const CACHE_NAME = 'artvault-v1'
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json'
-];
+]
 
-// Install - cache static assets
+// Install event - cache static assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+      return cache.addAll(STATIC_ASSETS)
     })
-  );
-  self.skipWaiting();
-});
+  )
+  self.skipWaiting()
+})
 
-// Activate - clean old caches
+// Activate event - clean old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -23,37 +23,42 @@ self.addEventListener('activate', (event) => {
         cacheNames
           .filter((name) => name !== CACHE_NAME)
           .map((name) => caches.delete(name))
-      );
+      )
     })
-  );
-  self.clients.claim();
-});
+  )
+  self.clients.claim()
+})
 
-// Fetch - network first, fallback to cache
+// Fetch event - network first, fallback to cache
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
-  if (event.request.method !== 'GET') return;
-  
-  // Skip API calls and external resources
-  const url = new URL(event.request.url);
-  if (url.origin !== location.origin) return;
-  if (url.pathname.startsWith('/api')) return;
+  if (event.request.method !== 'GET') return
+
+  // Skip API calls and Supabase
+  const url = new URL(event.request.url)
+  if (url.pathname.startsWith('/api') || 
+      url.hostname.includes('supabase') ||
+      url.hostname.includes('anthropic')) {
+    return
+  }
 
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Clone and cache successful responses
+        // Cache successful responses
         if (response.ok) {
-          const responseClone = response.clone();
+          const responseClone = response.clone()
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
+            cache.put(event.request, responseClone)
+          })
         }
-        return response;
+        return response
       })
       .catch(() => {
-        // Fallback to cache on network failure
-        return caches.match(event.request);
+        // Fallback to cache
+        return caches.match(event.request).then((cached) => {
+          return cached || caches.match('/')
+        })
       })
-  );
-});
+  )
+})

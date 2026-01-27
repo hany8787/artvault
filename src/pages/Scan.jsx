@@ -204,8 +204,9 @@ export default function Scan() {
 
     try {
       let imageUrl = null
-      let museumId = formData.museum_id
+      let museumId = formData.museum_id || null
 
+      // Upload image if exists
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop()
         const fileName = `${user.id}/${Date.now()}.${fileExt}`
@@ -214,7 +215,10 @@ export default function Scan() {
           .from('artworks')
           .upload(fileName, imageFile)
 
-        if (uploadError) throw uploadError
+        if (uploadError) {
+          console.error('Upload error:', uploadError)
+          throw uploadError
+        }
 
         const { data: { publicUrl } } = supabase.storage
           .from('artworks')
@@ -223,39 +227,53 @@ export default function Scan() {
         imageUrl = publicUrl
       }
 
-      if (formData.museum.trim() && !museumId) {
-        const { data: foundMuseumId } = await supabase
-          .rpc('find_or_create_museum', {
-            p_name: formData.museum.trim(),
-            p_city: formData.museum_city.trim() || null,
-            p_country: formData.museum_country.trim() || null
-          })
+      // Find or create museum if name provided but no ID
+      if (formData.museum && formData.museum.trim() && !museumId) {
+        try {
+          const { data: foundMuseumId, error: rpcError } = await supabase
+            .rpc('find_or_create_museum', {
+              p_name: formData.museum.trim(),
+              p_city: formData.museum_city?.trim() || null,
+              p_country: formData.museum_country?.trim() || null
+            })
 
-        if (foundMuseumId) {
-          museumId = foundMuseumId
+          if (!rpcError && foundMuseumId) {
+            museumId = foundMuseumId
+          }
+        } catch (rpcErr) {
+          console.warn('Museum RPC failed, continuing without museum_id:', rpcErr)
         }
       }
 
+      // Parse year as integer
+      const yearValue = formData.year?.trim() || ''
+      const parsedYear = yearValue ? parseInt(yearValue, 10) : null
+      const validYear = parsedYear && !isNaN(parsedYear) ? parsedYear : null
+
+      const artworkData = {
+        user_id: user.id,
+        image_url: imageUrl,
+        title: formData.title.trim(),
+        artist: formData.artist?.trim() || null,
+        artist_dates: formData.artist_dates?.trim() || null,
+        year: validYear,
+        period: formData.period?.trim() || null,
+        style: formData.style?.trim() || null,
+        medium: formData.medium?.trim() || null,
+        dimensions: formData.dimensions?.trim() || null,
+        museum: formData.museum?.trim() || null,
+        museum_id: museumId,
+        museum_city: formData.museum_city?.trim() || null,
+        museum_country: formData.museum_country?.trim() || null,
+        description: formData.description?.trim() || null,
+        curatorial_note: formData.curatorial_note?.trim() || null
+      }
+
+      console.log('Saving artwork:', artworkData)
+
       const { data, error: insertError } = await supabase
         .from('artworks')
-        .insert({
-          user_id: user.id,
-          image_url: imageUrl,
-          title: formData.title.trim(),
-          artist: formData.artist.trim() || null,
-          artist_dates: formData.artist_dates.trim() || null,
-          year: formData.year.trim() || null,
-          period: formData.period.trim() || null,
-          style: formData.style.trim() || null,
-          medium: formData.medium.trim() || null,
-          dimensions: formData.dimensions.trim() || null,
-          museum: formData.museum.trim() || null,
-          museum_id: museumId,
-          museum_city: formData.museum_city.trim() || null,
-          museum_country: formData.museum_country.trim() || null,
-          description: formData.description.trim() || null,
-          curatorial_note: formData.curatorial_note.trim() || null
-        })
+        .insert(artworkData)
         .select()
         .single()
 

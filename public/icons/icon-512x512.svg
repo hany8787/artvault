@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#221e10"/>
+  <rect x="51" y="51" width="410" height="410" rx="41" fill="none" stroke="#f2b90d" stroke-width="15"/>
+  <text x="256" y="317.44" text-anchor="middle" font-family="Georgia, serif" font-size="77" font-weight="bold" font-style="italic" fill="#f2b90d">ArtVault</text>
+</svg>

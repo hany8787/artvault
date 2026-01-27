@@ -1,32 +1,53 @@
 {
   "name": "ArtVault",
   "short_name": "ArtVault",
-  "description": "Scannez, identifiez et collectionnez des œuvres d'art",
+  "description": "Votre collection d'art personnelle - Scannez, identifiez et collectionnez vos œuvres préférées",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#221e10",
-  "theme_color": "#221e10",
-  "orientation": "portrait",
+  "theme_color": "#f2b90d",
+  "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icons/icon.svg",
-      "sizes": "any",
+      "src": "/icons/icon-192x192.svg",
+      "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "src": "/icons/icon-512x512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/icons/icon-192x192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.svg",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ],
-  "categories": ["lifestyle", "entertainment"],
-  "lang": "fr-FR"
+  "categories": ["lifestyle", "entertainment", "education"],
+  "shortcuts": [
+    {
+      "name": "Scanner une œuvre",
+      "short_name": "Scan",
+      "description": "Prendre en photo une œuvre d'art",
+      "url": "/scan",
+      "icons": [{ "src": "/icons/icon-96x96.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Ma Collection",
+      "short_name": "Collection",
+      "description": "Voir ma collection d'œuvres",
+      "url": "/collection",
+      "icons": [{ "src": "/icons/icon-96x96.svg", "sizes": "96x96" }]
+    }
+  ]
 }

@@ -39,7 +39,7 @@ export function ArtworkCard({ artwork, showOverlay = true, onFavoriteToggle }) {
         }`}>
           <FavoriteButton 
             artworkId={artwork.id}
-            initialFavorite={artwork.is_favorite}
+            isFavorite={artwork.is_favorite}
             size="sm"
             onToggle={onFavoriteToggle}
           />

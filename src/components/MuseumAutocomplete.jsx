@@ -79,25 +79,6 @@ export default function MuseumAutocomplete({
     }
   }
 
-  // Format display text with alias match highlight
-  function formatMuseumDisplay(museum) {
-    const matchedAlias = museum.aliases?.find(a =>
-      a.toLowerCase().includes(query.toLowerCase())
-    )
-
-    return (
-      <div>
-        <div className="text-white font-medium">{museum.name}</div>
-        <div className="text-white/50 text-sm">
-          {matchedAlias && matchedAlias.toLowerCase() !== museum.name.toLowerCase() && (
-            <span className="text-primary mr-2">({matchedAlias})</span>
-          )}
-          {[museum.city, museum.country].filter(Boolean).join(', ')}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div ref={wrapperRef} className="relative">
       <div className="relative">
@@ -106,16 +87,16 @@ export default function MuseumAutocomplete({
           value={query}
           onChange={handleInputChange}
           onFocus={handleFocus}
-          className="w-full bg-white/5 border border-white/20 rounded-lg px-4 py-3 text-white placeholder:text-white/40 focus:border-primary focus:outline-none"
+          className="input w-full"
           placeholder={placeholder}
         />
         {loading && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
           </div>
         )}
         {selectedMuseum && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-primary">
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-accent">
             <span className="material-symbols-outlined text-xl">verified</span>
           </div>
         )}
@@ -123,15 +104,18 @@ export default function MuseumAutocomplete({
 
       {/* Suggestions dropdown */}
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 glass rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-surface border border-default rounded-lg overflow-hidden max-h-64 overflow-y-auto shadow-xl">
           {suggestions.map(museum => (
             <button
               key={museum.id}
               type="button"
               onClick={() => handleSelectMuseum(museum)}
-              className="w-full px-4 py-3 text-left hover:bg-white/10 transition-colors border-b border-white/5 last:border-0"
+              className="w-full px-4 py-3 text-left hover:bg-black/5 dark:hover:bg-white/10 transition-colors border-b border-default last:border-0"
             >
-              {formatMuseumDisplay(museum)}
+              <div className="font-medium">{museum.name}</div>
+              <div className="text-secondary text-sm">
+                {[museum.city, museum.country].filter(Boolean).join(', ')}
+              </div>
             </button>
           ))}
         </div>
@@ -139,8 +123,8 @@ export default function MuseumAutocomplete({
 
       {/* No results message */}
       {showSuggestions && query.length >= 2 && suggestions.length === 0 && !loading && (
-        <div className="absolute z-50 w-full mt-1 glass rounded-lg p-4 text-white/60 text-sm">
-          Aucun musée trouvé. Le musée sera créé automatiquement.
+        <div className="absolute z-50 w-full mt-1 bg-surface border border-default rounded-lg p-4 text-secondary text-sm shadow-xl">
+          Aucun musée trouvé. Le nom sera enregistré tel quel.
         </div>
       )}
     </div>

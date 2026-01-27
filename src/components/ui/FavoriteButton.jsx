@@ -7,20 +7,20 @@ import { supabase } from '../../lib/supabase'
  */
 export function FavoriteButton({ 
   artworkId, 
-  initialFavorite = false, 
+  isFavorite = false, 
   size = 'md',
   onToggle 
 }) {
-  const [isFavorite, setIsFavorite] = useState(initialFavorite)
+  const [localFavorite, setLocalFavorite] = useState(isFavorite)
   const [isLoading, setIsLoading] = useState(false)
 
-  // Sync avec la prop parent quand elle change
+  // Sync with prop when it changes
   useEffect(() => {
-    setIsFavorite(initialFavorite)
-  }, [initialFavorite])
+    setLocalFavorite(isFavorite)
+  }, [isFavorite])
 
   const sizeClasses = {
-    sm: 'text-xl p-1',
+    sm: 'text-xl p-1.5',
     md: 'text-2xl p-2',
     lg: 'text-3xl p-3'
   }
@@ -31,10 +31,10 @@ export function FavoriteButton({
     
     if (isLoading) return
     
-    // Optimistic update - met à jour l'UI ET le parent immédiatement
-    const newValue = !isFavorite
-    setIsFavorite(newValue)
-    onToggle?.(newValue) // Appeler le parent AVANT la requête DB
+    const newValue = !localFavorite
+    
+    // Optimistic update - change UI immediately
+    setLocalFavorite(newValue)
     setIsLoading(true)
 
     try {
@@ -44,11 +44,13 @@ export function FavoriteButton({
         .eq('id', artworkId)
 
       if (error) {
-        // Rollback en cas d'erreur
-        setIsFavorite(!newValue)
-        onToggle?.(!newValue) // Rollback le parent aussi
+        // Revert on error
+        setLocalFavorite(!newValue)
         throw error
       }
+
+      // Notify parent after successful save
+      onToggle?.(newValue)
     } catch (err) {
       console.error('Erreur toggle favori:', err)
     } finally {
@@ -63,16 +65,16 @@ export function FavoriteButton({
       className={`
         ${sizeClasses[size]}
         rounded-full transition-all duration-200
-        ${isFavorite 
-          ? 'text-red-500 hover:text-red-400' 
-          : 'text-white/60 hover:text-white'
+        ${localFavorite 
+          ? 'text-red-500 bg-black/40' 
+          : 'text-white/80 hover:text-white bg-black/30 hover:bg-black/50'
         }
         ${isLoading ? 'opacity-50 cursor-wait' : 'hover:scale-110 active:scale-95'}
-        backdrop-blur-sm bg-black/20 hover:bg-black/40
+        backdrop-blur-sm
       `}
-      aria-label={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+      aria-label={localFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
     >
-      <span className={`material-symbols-outlined ${isFavorite ? 'filled' : ''}`}>
+      <span className={`material-symbols-outlined ${localFavorite ? 'filled' : ''}`}>
         favorite
       </span>
     </button>
