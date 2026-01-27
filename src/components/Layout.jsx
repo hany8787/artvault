@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import TopNav from './navigation/TopNav'
 import BottomNav from './navigation/BottomNav'
+import { InstallPrompt } from './ui/InstallPrompt'
 
 /**
  * Main Layout Component
@@ -28,6 +29,9 @@ export default function Layout() {
 
       {/* Bottom Navigation (Mobile) */}
       <BottomNav />
+
+      {/* PWA Install Banner */}
+      <InstallPrompt />
     </div>
   )
 }

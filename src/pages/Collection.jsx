@@ -292,7 +292,16 @@ export default function Collection() {
           }>
             {filteredArtworks.map((artwork) => (
               viewMode === 'grid' ? (
-                <ArtworkCard key={artwork.id} artwork={artwork} />
+                <ArtworkCard 
+                  key={artwork.id} 
+                  artwork={artwork}
+                  onFavoriteToggle={(newValue) => {
+                    // Update local state immediately
+                    setArtworks(prev => prev.map(a => 
+                      a.id === artwork.id ? { ...a, is_favorite: newValue } : a
+                    ))
+                  }}
+                />
               ) : (
                 // List view
                 <Link

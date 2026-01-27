@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ArtVault - Icon Generator</title>
+  <style>
+    body { font-family: system-ui; padding: 20px; background: #1a1a1a; color: white; }
+    .icon-row { display: flex; gap: 20px; flex-wrap: wrap; margin: 20px 0; }
+    .icon-box { text-align: center; }
+    canvas { border: 1px solid #333; }
+    button { padding: 10px 20px; margin: 10px 5px; cursor: pointer; }
+    a { color: #f2b90d; }
+  </style>
+</head>
+<body>
+  <h1>🎨 ArtVault Icon Generator</h1>
+  <p>Clique sur chaque bouton pour télécharger l'icône correspondante.</p>
+  
+  <div class="icon-row" id="icons"></div>
+  
+  <script>
+    const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+    const container = document.getElementById('icons');
+    
+    function drawIcon(ctx, size) {
+      const scale = size / 512;
+      
+      // Background
+      ctx.fillStyle = '#221e10';
+      roundRect(ctx, 0, 0, size, size, 96 * scale);
+      ctx.fill();
+      
+      // Frame border
+      ctx.strokeStyle = '#f2b90d';
+      ctx.lineWidth = 12 * scale;
+      roundRect(ctx, 96 * scale, 80 * scale, 320 * scale, 352 * scale, 8 * scale);
+      ctx.stroke();
+      
+      // Inner dark area
+      ctx.fillStyle = '#1a1709';
+      roundRect(ctx, 116 * scale, 100 * scale, 280 * scale, 312 * scale, 4 * scale);
+      ctx.fill();
+      
+      // Painting area
+      ctx.fillStyle = '#2a2515';
+      ctx.fillRect(126 * scale, 110 * scale, 260 * scale, 292 * scale);
+      
+      // Mountains
+      ctx.fillStyle = '#3d3520';
+      ctx.beginPath();
+      ctx.moveTo(126 * scale, 340 * scale);
+      ctx.lineTo(200 * scale, 260 * scale);
+      ctx.lineTo(260 * scale, 310 * scale);
+      ctx.lineTo(320 * scale, 240 * scale);
+      ctx.lineTo(386 * scale, 340 * scale);
+      ctx.closePath();
+      ctx.fill();
+      
+      ctx.fillStyle = '#4a4228';
+      ctx.beginPath();
+      ctx.moveTo(126 * scale, 360 * scale);
+      ctx.lineTo(180 * scale, 300 * scale);
+      ctx.lineTo(240 * scale, 340 * scale);
+      ctx.lineTo(300 * scale, 280 * scale);
+      ctx.lineTo(386 * scale, 360 * scale);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Sun
+      ctx.fillStyle = 'rgba(242, 185, 13, 0.8)';
+      ctx.beginPath();
+      ctx.arc(320 * scale, 170 * scale, 35 * scale, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Letter A
+      ctx.fillStyle = '#f2b90d';
+      ctx.font = `italic bold ${64 * scale}px Georgia, serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('A', 256 * scale, 450 * scale);
+    }
+    
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+    
+    sizes.forEach(size => {
+      const box = document.createElement('div');
+      box.className = 'icon-box';
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      canvas.style.width = Math.min(size, 128) + 'px';
+      canvas.style.height = Math.min(size, 128) + 'px';
+      
+      const ctx = canvas.getContext('2d');
+      drawIcon(ctx, size);
+      
+      const btn = document.createElement('button');
+      btn.textContent = `Download ${size}x${size}`;
+      btn.onclick = () => {
+        const link = document.createElement('a');
+        link.download = `icon-${size}x${size}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      };
+      
+      const label = document.createElement('p');
+      label.textContent = `${size}x${size}`;
+      
+      box.appendChild(canvas);
+      box.appendChild(document.createElement('br'));
+      box.appendChild(btn);
+      
+      container.appendChild(box);
+    });
+    
+    // Download all button
+    const allBtn = document.createElement('button');
+    allBtn.textContent = '⬇️ Download ALL Icons';
+    allBtn.style.fontSize = '18px';
+    allBtn.style.background = '#f2b90d';
+    allBtn.style.color = '#221e10';
+    allBtn.onclick = () => {
+      document.querySelectorAll('.icon-box button').forEach((btn, i) => {
+        setTimeout(() => btn.click(), i * 200);
+      });
+    };
+    document.body.insertBefore(allBtn, container);
+  </script>
+</body>
+</html>

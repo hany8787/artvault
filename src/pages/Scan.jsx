@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import MuseumAutocomplete from '../components/MuseumAutocomplete'
+import SuggestionInput from '../components/ui/SuggestionInput'
 import Loader from '../components/ui/Loader'
 
 const ANALYSIS_STEPS = [
@@ -568,26 +569,20 @@ export default function Scan() {
                     placeholder="1889"
                   />
                 </div>
-                <div>
-                  <label className="label text-secondary mb-2 block">Période</label>
-                  <input
-                    type="text"
-                    value={formData.period}
-                    onChange={(e) => updateField('period', e.target.value)}
-                    className="input"
-                    placeholder="Post-impressionnisme"
-                  />
-                </div>
-                <div>
-                  <label className="label text-secondary mb-2 block">Style</label>
-                  <input
-                    type="text"
-                    value={formData.style}
-                    onChange={(e) => updateField('style', e.target.value)}
-                    className="input"
-                    placeholder="Expressionnisme"
-                  />
-                </div>
+                <SuggestionInput
+                  label="Période"
+                  type="period"
+                  value={formData.period}
+                  onChange={(value) => updateField('period', value)}
+                  placeholder="Post-impressionnisme"
+                />
+                <SuggestionInput
+                  label="Style"
+                  type="style"
+                  value={formData.style}
+                  onChange={(value) => updateField('style', value)}
+                  placeholder="Paysage"
+                />
               </div>
             </div>
           </section>

@@ -33,8 +33,10 @@ export function ArtworkCard({ artwork, showOverlay = true, onFavoriteToggle }) {
           </div>
         )}
 
-        {/* Favorite button */}
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Favorite button - always visible if favorite, otherwise on hover */}
+        <div className={`absolute top-2 right-2 transition-opacity ${
+          artwork.is_favorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        }`}>
           <FavoriteButton 
             artworkId={artwork.id}
             initialFavorite={artwork.is_favorite}

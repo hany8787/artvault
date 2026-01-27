@@ -7,6 +7,8 @@ import Input, { Textarea } from '../components/ui/Input'
 import { ConfirmDialog } from '../components/ui/Modal'
 import Loader from '../components/ui/Loader'
 import { ArtworkCard } from '../components/ui/Card'
+import MuseumAutocomplete from '../components/MuseumAutocomplete'
+import SuggestionInput from '../components/ui/SuggestionInput'
 
 export default function ArtworkDetail() {
   const { id } = useParams()
@@ -104,13 +106,17 @@ export default function ArtworkDetail() {
     if (!editForm.title?.trim()) return
     setSaving(true)
     try {
+      // Convert year to integer or null
+      const yearValue = editForm.year ? parseInt(editForm.year, 10) : null
+      const validYear = !isNaN(yearValue) ? yearValue : null
+
       const { error } = await supabase
         .from('artworks')
         .update({
           title: editForm.title?.trim() || null,
           artist: editForm.artist?.trim() || null,
           artist_dates: editForm.artist_dates?.trim() || null,
-          year: editForm.year?.trim() || null,
+          year: validYear,
           period: editForm.period?.trim() || null,
           style: editForm.style?.trim() || null,
           medium: editForm.medium?.trim() || null,
@@ -123,7 +129,7 @@ export default function ArtworkDetail() {
         })
         .eq('id', id)
       if (error) throw error
-      setArtwork({ ...artwork, ...editForm })
+      setArtwork({ ...artwork, ...editForm, year: validYear })
       setIsEditing(false)
     } catch (err) {
       console.error('Save error:', err)
@@ -217,15 +223,19 @@ export default function ArtworkDetail() {
               value={editForm.year || ''}
               onChange={(e) => updateEditField('year', e.target.value)}
             />
-            <Input
+            <SuggestionInput
               label="Période"
+              type="period"
               value={editForm.period || ''}
-              onChange={(e) => updateEditField('period', e.target.value)}
+              onChange={(value) => updateEditField('period', value)}
+              placeholder="Post-impressionnisme"
             />
-            <Input
+            <SuggestionInput
               label="Style"
+              type="style"
               value={editForm.style || ''}
-              onChange={(e) => updateEditField('style', e.target.value)}
+              onChange={(value) => updateEditField('style', value)}
+              placeholder="Paysage"
             />
           </div>
 
@@ -243,12 +253,20 @@ export default function ArtworkDetail() {
             />
           </div>
 
-          {/* Museum */}
-          <Input
-            label="Musée"
-            value={editForm.museum || ''}
-            onChange={(e) => updateEditField('museum', e.target.value)}
-          />
+          {/* Museum with Autocomplete */}
+          <div>
+            <label className="label text-secondary mb-2 block">Musée / Collection</label>
+            <MuseumAutocomplete
+              value={editForm.museum || ''}
+              onChange={(value) => updateEditField('museum', value)}
+              onMuseumSelect={(museum) => {
+                updateEditField('museum', museum.name)
+                updateEditField('museum_city', museum.city || '')
+                updateEditField('museum_country', museum.country || '')
+              }}
+              placeholder="Musée d'Orsay"
+            />
+          </div>
 
           {/* City, Country */}
           <div className="grid grid-cols-2 gap-4">
