@@ -103,6 +103,7 @@ export default function Museums() {
     <div className="min-h-screen pb-24">
       {/* Header */}
       <header className="p-4 pt-6 bg-white dark:bg-bg-dark sticky top-0 z-10 border-b border-gray-100 dark:border-gray-800">
+        <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-display font-bold italic">Musées</h1>
@@ -157,6 +158,7 @@ export default function Museums() {
             Activer la géolocalisation pour trier par proximité
           </button>
         )}
+        </div>
       </header>
 
       {/* Content */}

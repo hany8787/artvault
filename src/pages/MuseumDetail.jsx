@@ -86,28 +86,47 @@ export default function MuseumDetail() {
         const now = new Date()
         now.setHours(0, 0, 0, 0)
 
-        // Extract keywords from museum name (remove common words)
-        const stopWords = ['musée', 'museum', 'de', 'du', 'la', 'le', 'les', 'd', 'l', 'des', 'centre', 'national', 'paris']
-        const museumWords = museum.name
+        // Normalize function for comparison
+        const normalize = (str) => (str || '')
           .toLowerCase()
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-          .split(/[\s\-']+/)
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '') // Remove accents
+          .replace(/['']/g, ' ')
+          .replace(/[-]/g, ' ')
+          .trim()
+
+        const museumNameNorm = normalize(museum.name)
+        
+        // Extract key identifying words from museum name
+        const stopWords = ['musee', 'museum', 'de', 'du', 'la', 'le', 'les', 'd', 'l', 'des', 'centre', 'national', 'paris', 'ville', 'art', 'arts']
+        const museumKeyWords = museumNameNorm
+          .split(/\s+/)
           .filter(word => word.length > 2 && !stopWords.includes(word))
 
         const exhibitions = data.data || data.exhibitions || []
         const matched = exhibitions.filter(expo => {
+          // Skip past exhibitions
           if (expo.date_end) {
             const endDate = new Date(expo.date_end)
             if (endDate < now) return false
           }
 
-          const venue = (expo.venue || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-          const address = (expo.address || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-          const title = (expo.title || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-          const description = (expo.description || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-          const searchText = venue + ' ' + address + ' ' + title + ' ' + description
+          const venueNorm = normalize(expo.venue)
           
-          return museumWords.some(word => searchText.includes(word))
+          // Method 1: Direct venue name match (best)
+          if (venueNorm.includes(museumNameNorm) || museumNameNorm.includes(venueNorm)) {
+            return true
+          }
+
+          // Method 2: Key words matching in venue (at least 2 words or 1 unique word)
+          const matchedWords = museumKeyWords.filter(word => venueNorm.includes(word))
+          if (matchedWords.length >= 2) return true
+          
+          // Special case: single distinctive word (like "orangerie", "orsay", "louvre", "pompidou")
+          const distinctiveWords = ['louvre', 'orsay', 'orangerie', 'pompidou', 'picasso', 'rodin', 'cluny', 'branly', 'quai', 'carnavalet', 'grevin', 'jacquemart']
+          if (matchedWords.some(w => distinctiveWords.includes(w))) return true
+
+          return false
         })
 
         setExhibitions(matched)
