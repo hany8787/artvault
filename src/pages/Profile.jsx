@@ -318,7 +318,7 @@ export default function Profile() {
           </button>
 
           {/* Translation notice */}
-          <p className="px-6 py-3 text-sm text-white/40 italic border-t border-primary/10">
+          <p className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400 italic border-t border-primary/10">
             Traductions bientôt disponibles
           </p>
         </div>

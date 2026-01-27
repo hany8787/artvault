@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { ArtworkCard, MuseumCard } from '../components/ui/Card'
@@ -38,7 +38,6 @@ const FEATURED_MUSEUMS = [
 
 export default function Home() {
   const { user, profile } = useAuth()
-  const navigate = useNavigate()
   const [recentArtworks, setRecentArtworks] = useState([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ total: 0, artists: 0, museums: 0 })
@@ -99,19 +98,26 @@ export default function Home() {
 
   async function fetchExhibitions() {
     try {
-      const params = new URLSearchParams({
-        limit: '3',
-        refine: 'tags:exposition',
-        order_by: 'date_start DESC'
-      })
+      // API Que Faire à Paris - correct URL format
+      const url = 'https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/que-faire-a-paris-/records?limit=10&refine=tags%3Aexposition'
 
-      const response = await fetch(
-        `https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/que-faire-a-paris-/records?${params}`
-      )
+      console.log('Fetching exhibitions from:', url)
 
-      if (!response.ok) throw new Error('API unavailable')
+      const response = await fetch(url)
+
+      if (!response.ok) {
+        console.error('API response not ok:', response.status)
+        throw new Error('API unavailable')
+      }
 
       const data = await response.json()
+      console.log('API response:', data)
+
+      if (!data.results || data.results.length === 0) {
+        console.log('No results from API')
+        setExhibitions([])
+        return
+      }
 
       const now = new Date()
       const transformed = data.results
@@ -122,7 +128,7 @@ export default function Home() {
         })
         .slice(0, 3)
         .map(record => ({
-          id: record.id,
+          id: record.id || Math.random().toString(),
           title: record.title || 'Sans titre',
           venue: record.address_name || record.address_street || 'Paris',
           date_start: record.date_start,
@@ -132,9 +138,11 @@ export default function Home() {
           image_url: record.cover_url || record.cover?.url,
         }))
 
+      console.log('Transformed exhibitions:', transformed)
       setExhibitions(transformed)
     } catch (err) {
       console.error('Error fetching exhibitions:', err)
+      setExhibitions([])
     } finally {
       setExhibitionsLoading(false)
     }
@@ -202,9 +210,57 @@ export default function Home() {
         </div>
       </section>
 
+      {/* How it works - RIGHT AFTER HERO */}
+      <section className="py-20 px-4 bg-bg-light dark:bg-bg-dark">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="font-display text-3xl md:text-4xl text-center mb-4 text-primary dark:text-white">
+            Comment ça marche
+          </h2>
+          <div className="divider-gold mx-auto mb-16" />
+
+          <div className="grid md:grid-cols-3 gap-12 stagger-children">
+            {/* Step 1 */}
+            <div className="text-center">
+              <span className="font-display text-6xl text-accent opacity-30">01</span>
+              <div className="w-16 h-16 mx-auto my-4 rounded-full bg-accent/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl text-accent">photo_camera</span>
+              </div>
+              <h3 className="font-display text-xl mb-2 text-primary dark:text-white">Photographiez</h3>
+              <p className="text-gray-600 dark:text-gray-300">
+                Capturez une œuvre lors de votre visite au musée
+              </p>
+            </div>
+
+            {/* Step 2 */}
+            <div className="text-center">
+              <span className="font-display text-6xl text-accent opacity-30">02</span>
+              <div className="w-16 h-16 mx-auto my-4 rounded-full bg-accent/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl text-accent">auto_awesome</span>
+              </div>
+              <h3 className="font-display text-xl mb-2 text-primary dark:text-white">Identifiez</h3>
+              <p className="text-gray-600 dark:text-gray-300">
+                Notre IA reconnaît l'œuvre et enrichit les informations
+              </p>
+            </div>
+
+            {/* Step 3 */}
+            <div className="text-center">
+              <span className="font-display text-6xl text-accent opacity-30">03</span>
+              <div className="w-16 h-16 mx-auto my-4 rounded-full bg-accent/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-2xl text-accent">collections</span>
+              </div>
+              <h3 className="font-display text-xl mb-2 text-primary dark:text-white">Collectionnez</h3>
+              <p className="text-gray-600 dark:text-gray-300">
+                Constituez votre collection personnelle d'œuvres d'art
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Recent artworks (if user has artworks) */}
       {stats.total > 0 && (
-        <section className="py-20 px-4 bg-bg-light dark:bg-bg-dark">
+        <section className="py-20 px-4 bg-gray-50 dark:bg-gray-900/50">
           <div className="max-w-6xl mx-auto">
             <div className="flex items-center justify-between mb-8">
               <div>
@@ -242,7 +298,7 @@ export default function Home() {
 
       {/* Empty state CTA (if no artworks) */}
       {!loading && stats.total === 0 && (
-        <section className="py-20 px-4 bg-bg-light dark:bg-bg-dark">
+        <section className="py-20 px-4 bg-gray-50 dark:bg-gray-900/50">
           <div className="max-w-xl mx-auto text-center">
             <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-accent/10 flex items-center justify-center">
               <span className="material-symbols-outlined text-5xl text-accent">add_photo_alternate</span>
@@ -261,8 +317,8 @@ export default function Home() {
         </section>
       )}
 
-      {/* Exhibitions - BEFORE Museums */}
-      <section className="py-20 px-4 bg-gray-50 dark:bg-gray-900/50">
+      {/* Exhibitions */}
+      <section className="py-20 px-4 bg-bg-light dark:bg-bg-dark">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <div>
@@ -336,8 +392,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Museums preview - AFTER Exhibitions */}
-      <section className="py-20 px-4 bg-bg-light dark:bg-bg-dark">
+      {/* Museums preview */}
+      <section className="py-20 px-4 bg-gray-50 dark:bg-gray-900/50">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <div>
@@ -358,54 +414,6 @@ export default function Home() {
             {FEATURED_MUSEUMS.map((museum) => (
               <MuseumCard key={museum.id} museum={museum} />
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* How it works - AT THE END */}
-      <section className="py-20 px-4 bg-gray-50 dark:bg-gray-900/50">
-        <div className="max-w-5xl mx-auto">
-          <h2 className="font-display text-3xl md:text-4xl text-center mb-4 text-primary dark:text-white">
-            Comment ça marche
-          </h2>
-          <div className="divider-gold mx-auto mb-16" />
-
-          <div className="grid md:grid-cols-3 gap-12 stagger-children">
-            {/* Step 1 */}
-            <div className="text-center">
-              <span className="font-display text-6xl text-accent opacity-30">01</span>
-              <div className="w-16 h-16 mx-auto my-4 rounded-full bg-accent/10 flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl text-accent">photo_camera</span>
-              </div>
-              <h3 className="font-display text-xl mb-2 text-primary dark:text-white">Photographiez</h3>
-              <p className="text-gray-600 dark:text-gray-300">
-                Capturez une œuvre lors de votre visite au musée
-              </p>
-            </div>
-
-            {/* Step 2 */}
-            <div className="text-center">
-              <span className="font-display text-6xl text-accent opacity-30">02</span>
-              <div className="w-16 h-16 mx-auto my-4 rounded-full bg-accent/10 flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl text-accent">auto_awesome</span>
-              </div>
-              <h3 className="font-display text-xl mb-2 text-primary dark:text-white">Identifiez</h3>
-              <p className="text-gray-600 dark:text-gray-300">
-                Notre IA reconnaît l'œuvre et enrichit les informations
-              </p>
-            </div>
-
-            {/* Step 3 */}
-            <div className="text-center">
-              <span className="font-display text-6xl text-accent opacity-30">03</span>
-              <div className="w-16 h-16 mx-auto my-4 rounded-full bg-accent/10 flex items-center justify-center">
-                <span className="material-symbols-outlined text-2xl text-accent">collections</span>
-              </div>
-              <h3 className="font-display text-xl mb-2 text-primary dark:text-white">Collectionnez</h3>
-              <p className="text-gray-600 dark:text-gray-300">
-                Constituez votre collection personnelle d'œuvres d'art
-              </p>
-            </div>
           </div>
         </div>
       </section>
