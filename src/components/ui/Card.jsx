@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom'
+import { FavoriteButton } from './FavoriteButton'
 
 /**
  * Artwork Card Component
  * For displaying artworks in grids
  */
-export function ArtworkCard({ artwork, showOverlay = true }) {
+export function ArtworkCard({ artwork, showOverlay = true, onFavoriteToggle }) {
   return (
     <Link
       to={`/artwork/${artwork.id}`}
@@ -32,12 +33,15 @@ export function ArtworkCard({ artwork, showOverlay = true }) {
           </div>
         )}
 
-        {/* Favorite badge */}
-        {artwork.is_favorite && (
-          <div className="absolute top-2 right-2">
-            <span className="material-symbols-outlined filled text-accent">favorite</span>
-          </div>
-        )}
+        {/* Favorite button */}
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <FavoriteButton 
+            artworkId={artwork.id}
+            initialFavorite={artwork.is_favorite}
+            size="sm"
+            onToggle={onFavoriteToggle}
+          />
+        </div>
       </div>
 
       {/* Info */}

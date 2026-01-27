@@ -304,12 +304,12 @@ export default function ArtworkDetail() {
               disabled={togglingFavorite}
               className={`w-10 h-10 backdrop-blur-xl rounded-full flex items-center justify-center transition-all ${
                 artwork.is_favorite
-                  ? 'bg-accent text-white'
+                  ? 'bg-red-500 text-white'
                   : 'bg-white/10 text-white hover:bg-white/20'
               }`}
             >
-              <span className="material-symbols-outlined">
-                {artwork.is_favorite ? 'favorite' : 'favorite_border'}
+              <span className={`material-symbols-outlined ${artwork.is_favorite ? 'filled' : ''}`}>
+                favorite
               </span>
             </button>
 

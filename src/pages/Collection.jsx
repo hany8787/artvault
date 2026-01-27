@@ -186,6 +186,17 @@ export default function Collection() {
 
           {/* Header actions */}
           <div className="flex items-center gap-2">
+            {/* Favorites quick filter */}
+            <button
+              onClick={() => setFavoritesOnly(!favoritesOnly)}
+              className={`btn btn-ghost btn-icon ${favoritesOnly ? 'text-red-500' : ''}`}
+              title="Favoris uniquement"
+            >
+              <span className={`material-symbols-outlined ${favoritesOnly ? 'filled' : ''}`}>
+                favorite
+              </span>
+            </button>
+
             {/* Search toggle */}
             <button
               onClick={() => setShowSearch(!showSearch)}
