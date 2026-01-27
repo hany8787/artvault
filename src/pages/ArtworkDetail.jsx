@@ -200,6 +200,7 @@ export default function ArtworkDetail() {
             </button>
             <h1 className="font-display italic text-lg">Modifier</h1>
             <button
+              type="button"
               onClick={handleSave}
               disabled={saving || !editForm.title?.trim()}
               className="btn btn-primary"

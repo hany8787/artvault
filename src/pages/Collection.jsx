@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { ArtworkCard } from '../components/ui/Card'
+import { FavoriteButton } from '../components/ui/FavoriteButton'
 import { SkeletonCard } from '../components/ui/Loader'
 import EmptyState from '../components/ui/EmptyState'
 import { Drawer } from '../components/ui/Modal'
@@ -304,12 +305,14 @@ export default function Collection() {
                 />
               ) : (
                 // List view
-                <Link
+                <div
                   key={artwork.id}
-                  to={`/artwork/${artwork.id}`}
                   className="card flex gap-4 p-4"
                 >
-                  <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-secondary">
+                  <Link
+                    to={`/artwork/${artwork.id}`}
+                    className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-secondary"
+                  >
                     {artwork.image_url ? (
                       <img
                         src={artwork.image_url}
@@ -321,18 +324,23 @@ export default function Collection() {
                         <span className="material-symbols-outlined text-secondary">image</span>
                       </div>
                     )}
-                  </div>
-                  <div className="flex-1 min-w-0">
+                  </Link>
+                  <Link to={`/artwork/${artwork.id}`} className="flex-1 min-w-0">
                     <h3 className="font-display italic truncate">{artwork.title}</h3>
                     <p className="text-secondary text-sm truncate">{artwork.artist}</p>
                     <p className="text-secondary text-xs mt-1">{artwork.year}</p>
-                  </div>
-                  {artwork.is_favorite && (
-                    <span className="material-symbols-outlined filled text-accent self-center">
-                      favorite
-                    </span>
-                  )}
-                </Link>
+                  </Link>
+                  <FavoriteButton 
+                    artworkId={artwork.id}
+                    initialFavorite={artwork.is_favorite}
+                    size="sm"
+                    onToggle={(newValue) => {
+                      setArtworks(prev => prev.map(a => 
+                        a.id === artwork.id ? { ...a, is_favorite: newValue } : a
+                      ))
+                    }}
+                  />
+                </div>
               )
             ))}
           </div>
