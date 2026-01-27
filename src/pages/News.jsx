@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { ExhibitionCard } from '../components/ui/Card'
 import { SkeletonCard } from '../components/ui/Loader'
 import { ErrorState } from '../components/ui/EmptyState'
 
@@ -57,42 +56,43 @@ export default function News() {
     setError(null)
 
     try {
-      // Use Que Faire à Paris API
-      const params = new URLSearchParams({
-        limit: '20',
-        refine: 'tags:exposition',
-        order_by: 'date_start DESC'
-      })
-
+      // Use our Supabase Edge Function
       const response = await fetch(
-        `https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/que-faire-a-paris-/records?${params}`
+        'https://dzjgilplznhhwwitjztf.supabase.co/functions/v1/get-exhibitions?limit=100'
       )
 
       if (!response.ok) throw new Error('API unavailable')
 
       const data = await response.json()
 
-      // Filter and transform exhibitions
-      const now = new Date()
-      const transformed = data.results
-        .filter(record => {
-          // Filter for exhibitions with dates
-          if (!record.date_end) return true
-          const endDate = new Date(record.date_end)
-          return endDate >= now
-        })
-        .map(record => ({
-          id: record.id,
-          title: record.title || 'Sans titre',
-          venue: record.address_name || record.address_street || 'Paris',
-          date_start: record.date_start,
-          date_end: record.date_end,
-          description: record.description || record.lead_text,
-          url: record.url,
-          image_url: record.cover_url || record.cover?.url,
-        }))
+      if (!data.success) {
+        throw new Error(data.error || 'Erreur inconnue')
+      }
 
-      setExhibitions(transformed)
+      // Filter: only current or future exhibitions
+      const now = new Date()
+      now.setHours(0, 0, 0, 0) // Start of today
+      
+      const filtered = data.data.filter(expo => {
+        // If no end date, check start date
+        if (!expo.date_end) {
+          if (!expo.date_start) return true // No dates = keep it
+          const startDate = new Date(expo.date_start)
+          return startDate >= now // Future event
+        }
+        // Has end date: keep if end date is today or later
+        const endDate = new Date(expo.date_end)
+        return endDate >= now
+      })
+
+      // Sort by start date (soonest first)
+      filtered.sort((a, b) => {
+        const dateA = a.date_start ? new Date(a.date_start) : new Date('2099-12-31')
+        const dateB = b.date_start ? new Date(b.date_start) : new Date('2099-12-31')
+        return dateA - dateB
+      })
+
+      setExhibitions(filtered)
     } catch (err) {
       console.error('Error fetching exhibitions:', err)
       setError(err.message)
@@ -145,7 +145,7 @@ export default function News() {
             Expositions à Paris
           </h2>
           <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Expositions en cours et à venir dans la capitale
+            {exhibitions.length} expositions en cours et à venir
           </p>
 
           {loading ? (
@@ -157,7 +157,7 @@ export default function News() {
           ) : error ? (
             <ErrorState
               title="Impossible de charger les expositions"
-              description="L'API n'est pas disponible pour le moment"
+              description={error}
               onRetry={fetchExhibitions}
             />
           ) : exhibitions.length === 0 ? (
@@ -176,7 +176,7 @@ export default function News() {
                   className="card group overflow-hidden"
                 >
                   {/* Image */}
-                  <div className="aspect-[16/9] overflow-hidden bg-gray-100 dark:bg-gray-800">
+                  <div className="aspect-[16/9] overflow-hidden bg-gray-100 dark:bg-gray-800 relative">
                     {exhibition.image_url ? (
                       <img
                         src={exhibition.image_url}
@@ -191,10 +191,26 @@ export default function News() {
                         <span className="material-symbols-outlined text-4xl text-gray-300 dark:text-gray-600">image</span>
                       </div>
                     )}
+                    {/* Free badge */}
+                    {exhibition.is_free && (
+                      <span className="absolute top-2 left-2 px-2 py-1 bg-green-500 text-white text-xs font-medium rounded">
+                        Gratuit
+                      </span>
+                    )}
                   </div>
 
                   {/* Info */}
                   <div className="p-4">
+                    {/* Tags */}
+                    {exhibition.tags && exhibition.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {exhibition.tags.slice(0, 2).map((tag, i) => (
+                          <span key={i} className="text-xs text-accent font-medium">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <h3 className="font-display text-lg mb-1 line-clamp-2 text-primary dark:text-white">
                       {exhibition.title}
                     </h3>

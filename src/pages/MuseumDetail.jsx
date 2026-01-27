@@ -10,12 +10,21 @@ export default function MuseumDetail() {
   const { user } = useAuth()
   const [museum, setMuseum] = useState(null)
   const [artworks, setArtworks] = useState([])
+  const [exhibitions, setExhibitions] = useState([])
+  const [loadingExhibitions, setLoadingExhibitions] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetchMuseum()
     fetchArtworks()
   }, [id])
+
+  // Fetch exhibitions when museum is loaded
+  useEffect(() => {
+    if (museum) {
+      fetchExhibitions()
+    }
+  }, [museum])
 
   async function fetchMuseum() {
     const { data, error } = await supabase
@@ -43,10 +52,74 @@ export default function MuseumDetail() {
     setArtworks(data || [])
   }
 
+  async function fetchExhibitions() {
+    // Only fetch from API for Paris museums
+    const isParis = museum.city?.toLowerCase().includes('paris')
+    if (!isParis) return
+
+    setLoadingExhibitions(true)
+    try {
+      const response = await fetch(
+        'https://dzjgilplznhhwwitjztf.supabase.co/functions/v1/get-exhibitions?limit=100'
+      )
+      const data = await response.json()
+
+      if (data.success) {
+        const now = new Date()
+        now.setHours(0, 0, 0, 0)
+
+        // Extract keywords from museum name (remove common words)
+        const stopWords = ['musée', 'museum', 'de', 'du', 'la', 'le', 'les', 'd', 'l', 'des', 'centre', 'national', 'paris']
+        const museumWords = museum.name
+          .toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents
+          .split(/[\s\-']+/)
+          .filter(word => word.length > 2 && !stopWords.includes(word))
+
+        const matched = data.data.filter(expo => {
+          // Check if exhibition is current or future
+          if (expo.date_end) {
+            const endDate = new Date(expo.date_end)
+            if (endDate < now) return false
+          }
+
+          // Match by venue, address, title, or description
+          const venue = (expo.venue || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          const address = (expo.address || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          const title = (expo.title || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          const description = (expo.description || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          const searchText = venue + ' ' + address + ' ' + title + ' ' + description
+          
+          // Check if any keyword from museum name appears
+          return museumWords.some(word => searchText.includes(word))
+        })
+
+        setExhibitions(matched)
+      }
+    } catch (err) {
+      console.error('Error fetching exhibitions:', err)
+    } finally {
+      setLoadingExhibitions(false)
+    }
+  }
+
   function openMaps() {
     if (!museum) return
     const query = encodeURIComponent(`${museum.name}, ${museum.address || museum.city}`)
     window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank')
+  }
+
+  function formatDateRange(startDate, endDate) {
+    const options = { day: 'numeric', month: 'long', year: 'numeric' }
+    if (!startDate && !endDate) return 'Dates non communiquées'
+    const start = startDate ? new Date(startDate) : null
+    const end = endDate ? new Date(endDate) : null
+    if (start && end) {
+      return `Du ${start.toLocaleDateString('fr-FR', options)} au ${end.toLocaleDateString('fr-FR', options)}`
+    }
+    if (start) return `À partir du ${start.toLocaleDateString('fr-FR', options)}`
+    if (end) return `Jusqu'au ${end.toLocaleDateString('fr-FR', options)}`
+    return ''
   }
 
   if (loading) {
@@ -64,6 +137,8 @@ export default function MuseumDetail() {
       </div>
     )
   }
+
+  const isParis = museum.city?.toLowerCase().includes('paris')
 
   return (
     <div className="min-h-screen pb-24">
@@ -98,9 +173,7 @@ export default function MuseumDetail() {
           <h1 className="font-display text-3xl italic mb-2">{museum.name}</h1>
 
           {museum.address && (
-            <p className="text-secondary mb-4">
-              {museum.address}
-            </p>
+            <p className="text-secondary mb-4">{museum.address}</p>
           )}
 
           {/* Quick info */}
@@ -137,20 +210,100 @@ export default function MuseumDetail() {
           {museum.description && (
             <div className="mb-6">
               <h2 className="label mb-2">À propos</h2>
-              <p className="text-secondary leading-relaxed">
-                {museum.description}
-              </p>
+              <p className="text-secondary leading-relaxed">{museum.description}</p>
             </div>
           )}
 
           {/* Actions */}
-          <button
-            onClick={openMaps}
-            className="btn btn-primary w-full"
-          >
+          <button onClick={openMaps} className="btn btn-primary w-full">
             <span className="material-symbols-outlined">directions</span>
             Y aller
           </button>
+        </div>
+
+        {/* Exhibitions Section */}
+        <div className="mb-8">
+          <h2 className="font-display text-2xl italic mb-4">Expositions en cours</h2>
+
+          {isParis ? (
+            // Paris museums: show exhibitions from API
+            loadingExhibitions ? (
+              <div className="text-center py-8">
+                <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <p className="text-secondary text-sm">Recherche des expositions...</p>
+              </div>
+            ) : exhibitions.length > 0 ? (
+              <div className="space-y-4">
+                {exhibitions.map((expo) => (
+                  <a
+                    key={expo.id}
+                    href={expo.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block bg-secondary rounded-xl overflow-hidden hover:ring-2 hover:ring-accent transition-all"
+                  >
+                    <div className="flex gap-4">
+                      {expo.image_url && (
+                        <div className="w-24 h-24 flex-shrink-0">
+                          <img
+                            src={expo.image_url}
+                            alt={expo.title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1 py-3 pr-4">
+                        <h3 className="font-medium line-clamp-2 mb-1">{expo.title}</h3>
+                        <p className="text-secondary text-sm">
+                          {formatDateRange(expo.date_start, expo.date_end)}
+                        </p>
+                        {expo.is_free && (
+                          <span className="inline-block mt-1 px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded">
+                            Gratuit
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-secondary rounded-xl">
+                <span className="material-symbols-outlined text-3xl text-secondary mb-2">event</span>
+                <p className="text-secondary">Aucune exposition trouvée pour ce musée</p>
+                {museum.website && (
+                  <a
+                    href={museum.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-accent text-sm mt-2 hover:underline"
+                  >
+                    Voir le site officiel
+                    <span className="material-symbols-outlined text-sm">open_in_new</span>
+                  </a>
+                )}
+              </div>
+            )
+          ) : (
+            // Non-Paris museums: link to official website
+            <div className="text-center py-8 bg-secondary rounded-xl">
+              <span className="material-symbols-outlined text-3xl text-secondary mb-2">language</span>
+              <p className="text-secondary mb-3">
+                Consultez les expositions sur le site officiel
+              </p>
+              {museum.website && (
+                <a
+                  href={museum.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-outline"
+                >
+                  Voir les expositions
+                  <span className="material-symbols-outlined text-lg">open_in_new</span>
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
         {/* My artworks from this museum */}
