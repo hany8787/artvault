@@ -238,11 +238,15 @@ export default function Museums() {
           </div>
         ) : (
           /* Map View */
-          <div className="h-[70vh] rounded-xl overflow-hidden shadow-lg border border-gray-200 dark:border-gray-700">
+          <div
+            className="rounded-xl overflow-hidden shadow-lg border border-gray-200 dark:border-gray-700"
+            style={{ height: '70vh', minHeight: '400px' }}
+          >
             <MapContainer
+              key="museum-map"
               center={mapCenter}
               zoom={userLocation ? 12 : 5}
-              className="w-full h-full"
+              style={{ width: '100%', height: '100%' }}
               scrollWheelZoom={true}
             >
               <TileLayer

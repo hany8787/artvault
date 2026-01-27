@@ -316,6 +316,11 @@ export default function Profile() {
               <span className="material-symbols-outlined text-secondary">chevron_right</span>
             </div>
           </button>
+
+          {/* Translation notice */}
+          <p className="px-6 py-3 text-sm text-white/40 italic border-t border-primary/10">
+            Traductions bientôt disponibles
+          </p>
         </div>
 
         {/* Help & Support */}
