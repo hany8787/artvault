@@ -323,17 +323,93 @@ export default function ArtworkDetail() {
 
   return (
     <div className="min-h-screen">
-      {/* Simple Back Header */}
-      <header className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/70 to-transparent">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+      {/* Back Button - Fixed, very visible */}
+      <button
+        onClick={() => navigate(-1)}
+        className="fixed top-6 left-6 z-50 w-12 h-12 bg-black/80 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-black transition-colors border-2 border-white/30 shadow-lg"
+      >
+        <span className="material-symbols-outlined text-2xl">arrow_back</span>
+      </button>
+
+      {/* Floating Action Buttons - Right side */}
+      <div className="fixed right-4 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-3" onClick={e => e.stopPropagation()}>
+        {/* Favorite */}
+        <button
+          onClick={toggleFavorite}
+          disabled={togglingFavorite}
+          className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-lg ${
+            artwork.is_favorite
+              ? 'bg-red-500 text-white'
+              : 'bg-black/70 backdrop-blur-xl text-white hover:bg-black/90 border border-white/20'
+          }`}
+          title={artwork.is_favorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+        >
+          <span className={`material-symbols-outlined text-xl ${artwork.is_favorite ? 'filled' : ''}`}>
+            favorite
+          </span>
+        </button>
+
+        {/* Edit */}
+        <button
+          onClick={() => setIsEditing(true)}
+          className="w-12 h-12 rounded-full bg-black/70 backdrop-blur-xl text-white hover:bg-black/90 border border-white/20 flex items-center justify-center transition-all shadow-lg"
+          title="Modifier"
+        >
+          <span className="material-symbols-outlined text-xl">edit</span>
+        </button>
+
+        {/* Share */}
+        <button
+          onClick={shareArtwork}
+          className="w-12 h-12 rounded-full bg-black/70 backdrop-blur-xl text-white hover:bg-black/90 border border-white/20 flex items-center justify-center transition-all shadow-lg"
+          title="Partager"
+        >
+          <span className="material-symbols-outlined text-xl">share</span>
+        </button>
+
+        {/* More Menu */}
+        <div className="relative">
           <button
-            onClick={() => navigate(-1)}
-            className="w-11 h-11 bg-black/50 backdrop-blur-xl rounded-full flex items-center justify-center text-white hover:bg-black/70 transition-colors border border-white/20"
+            onClick={() => setShowMenu(!showMenu)}
+            className="w-12 h-12 rounded-full bg-black/70 backdrop-blur-xl text-white hover:bg-black/90 border border-white/20 flex items-center justify-center transition-all shadow-lg"
+            title="Plus d'options"
           >
-            <span className="material-symbols-outlined">arrow_back</span>
+            <span className="material-symbols-outlined text-xl">more_vert</span>
           </button>
+
+          {showMenu && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+              <div className="absolute right-full mr-2 top-0 w-52 bg-black/90 backdrop-blur-xl rounded-xl overflow-hidden z-50 border border-white/20 shadow-xl">
+                <button
+                  onClick={() => { setShowCollectionModal(true); setShowMenu(false) }}
+                  className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-xl">folder</span>
+                  Ajouter à une collection
+                </button>
+                <button
+                  onClick={toggleTheme}
+                  className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-xl">
+                    {theme === 'dark' ? 'light_mode' : 'dark_mode'}
+                  </span>
+                  {theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+                </button>
+                <div className="border-t border-white/10" />
+                <button
+                  onClick={() => { setShowDeleteModal(true); setShowMenu(false) }}
+                  className="w-full px-4 py-3 text-left text-red-400 hover:bg-red-500/10 flex items-center gap-3 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-xl">delete</span>
+                  Supprimer
+                </button>
+              </div>
+            </>
+          )}
         </div>
-      </header>
+      </div>
 
       {/* Hero Image - 70vh */}
       <div
@@ -351,90 +427,11 @@ export default function ArtworkDetail() {
             <span className="material-symbols-outlined text-8xl text-white/20">image</span>
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
-
-        {/* Action Bar - Fixed at bottom of hero image */}
-        <div className="absolute bottom-0 left-0 right-0 z-30" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center justify-center gap-3 px-4 py-4 bg-black/70 backdrop-blur-md border-t border-white/10">
-            {/* Favorite */}
-            <button
-              onClick={toggleFavorite}
-              disabled={togglingFavorite}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-medium transition-all ${
-                artwork.is_favorite
-                  ? 'bg-red-500 text-white'
-                  : 'bg-white/15 text-white hover:bg-white/25 border border-white/20'
-              }`}
-            >
-              <span className={`material-symbols-outlined text-xl ${artwork.is_favorite ? 'filled' : ''}`}>
-                favorite
-              </span>
-              <span className="text-sm">{artwork.is_favorite ? 'Favori' : 'Ajouter'}</span>
-            </button>
-
-            {/* Edit */}
-            <button
-              onClick={() => setIsEditing(true)}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/15 text-white hover:bg-white/25 border border-white/20 font-medium transition-all"
-            >
-              <span className="material-symbols-outlined text-xl">edit</span>
-              <span className="text-sm">Modifier</span>
-            </button>
-
-            {/* More Menu */}
-            <div className="relative">
-              <button
-                onClick={() => setShowMenu(!showMenu)}
-                className="flex items-center justify-center w-11 h-11 rounded-full bg-white/15 text-white hover:bg-white/25 border border-white/20 transition-all"
-              >
-                <span className="material-symbols-outlined">more_horiz</span>
-              </button>
-
-              {showMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                  <div className="absolute right-0 bottom-full mb-2 w-52 bg-black/90 backdrop-blur-xl rounded-xl overflow-hidden z-50 border border-white/20 shadow-xl">
-                    <button
-                      onClick={() => { setShowCollectionModal(true); setShowMenu(false) }}
-                      className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-xl">folder</span>
-                      Ajouter à une collection
-                    </button>
-                    <button
-                      onClick={() => { shareArtwork(); setShowMenu(false) }}
-                      className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-xl">share</span>
-                      Partager
-                    </button>
-                    <button
-                      onClick={toggleTheme}
-                      className="w-full px-4 py-3 text-left text-white hover:bg-white/10 flex items-center gap-3 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-xl">
-                        {theme === 'dark' ? 'light_mode' : 'dark_mode'}
-                      </span>
-                      {theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
-                    </button>
-                    <div className="border-t border-white/10" />
-                    <button
-                      onClick={() => { setShowDeleteModal(true); setShowMenu(false) }}
-                      className="w-full px-4 py-3 text-left text-red-400 hover:bg-red-500/10 flex items-center gap-3 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-xl">delete</span>
-                      Supprimer
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
 
         {/* Zoom hint */}
         {artwork.image_url && (
-          <div className="absolute bottom-20 right-4 flex items-center gap-2 text-white/50 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 text-white/50 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
             <span className="material-symbols-outlined text-lg">zoom_in</span>
             Cliquez pour agrandir
           </div>
@@ -448,7 +445,7 @@ export default function ArtworkDetail() {
         </h1>
 
         {/* Artist with gold accent lines */}
-        <div className="flex items-center justify-center gap-4 max-w-lg mx-auto mb-8">
+        <div className="flex items-center justify-center gap-4 max-w-lg mx-auto">
           <div className="flex-1 h-px bg-gradient-to-r from-transparent to-accent/50" />
           <span className="font-serif italic text-xl text-white/90">
             {artwork.artist || 'Artiste inconnu'}
@@ -457,17 +454,6 @@ export default function ArtworkDetail() {
             )}
           </span>
           <div className="flex-1 h-px bg-gradient-to-l from-transparent to-accent/50" />
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex items-center justify-center gap-4">
-          <button
-            onClick={shareArtwork}
-            className="btn btn-outline bg-white/10 backdrop-blur-xl text-white border-white/20 hover:border-accent hover:text-accent"
-          >
-            <span className="material-symbols-outlined">share</span>
-            Partager
-          </button>
         </div>
       </section>
 

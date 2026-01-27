@@ -10,8 +10,8 @@ import { InstallPrompt } from './ui/InstallPrompt'
 export default function Layout() {
   const location = useLocation()
 
-  // Full screen pages (no padding, no nav)
-  const isFullScreen = location.pathname === '/scan'
+  // Full screen pages (no padding, no nav) - immersive experience
+  const isFullScreen = location.pathname === '/scan' || location.pathname.startsWith('/artwork/')
 
   if (isFullScreen) {
     return <Outlet />
