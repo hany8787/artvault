@@ -318,9 +318,12 @@ export default function Profile() {
           </button>
 
           {/* Translation notice */}
-          <p className="px-6 py-3 text-sm text-gray-500 dark:text-gray-400 italic border-t border-primary/10">
-            Traductions bientôt disponibles
-          </p>
+          <div className="px-6 py-3 border-t border-primary/10 bg-accent/5">
+            <p className="text-sm text-accent/70 italic flex items-center gap-2">
+              <span className="material-symbols-outlined text-base">info</span>
+              Traductions bientôt disponibles
+            </p>
+          </div>
         </div>
 
         {/* Help & Support */}
