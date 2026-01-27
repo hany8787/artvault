@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 
 /**
  * Bottom Navigation for Mobile
- * 5 tabs: Home, Collection, Scanner (center), Museums, News
+ * 5 tabs: Accueil, Actualités, Scanner (center), Collection, Musées
  */
 export default function BottomNav() {
   const location = useLocation()
@@ -12,12 +12,13 @@ export default function BottomNav() {
     return null
   }
 
+  // New order: Accueil, Actualités, Scanner (center), Collection, Musées
   const navItems = [
     { path: '/', icon: 'home', label: 'Accueil' },
-    { path: '/collection', icon: 'collections', label: 'Collection' },
-    { path: '/scan', icon: 'photo_camera', label: 'Scanner', isCenter: true },
-    { path: '/museums', icon: 'museum', label: 'Musées' },
     { path: '/news', icon: 'calendar_month', label: 'Actus' },
+    { path: '/scan', icon: 'photo_camera', label: 'Scanner', isCenter: true },
+    { path: '/collection', icon: 'collections', label: 'Collection' },
+    { path: '/museums', icon: 'museum', label: 'Musées' },
   ]
 
   return (

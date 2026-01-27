@@ -8,7 +8,7 @@ import { useAuth } from '../../contexts/AuthContext'
  */
 export default function TopNav() {
   const { theme, toggleTheme } = useTheme()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const location = useLocation()
 
   // Hide on scan page (full screen)
@@ -16,12 +16,13 @@ export default function TopNav() {
     return null
   }
 
+  // New order: Accueil, Actualités, Scanner, Collection, Musées
   const navLinks = [
-    { path: '/', label: 'Accueil' },
-    { path: '/collection', label: 'Collection' },
-    { path: '/scan', label: 'Scanner' },
-    { path: '/museums', label: 'Musées' },
-    { path: '/news', label: 'Actualités' },
+    { path: '/', label: 'Accueil', icon: 'home' },
+    { path: '/news', label: 'Actualités', icon: 'calendar_month' },
+    { path: '/scan', label: 'Scanner', icon: 'photo_camera' },
+    { path: '/collection', label: 'Collection', icon: 'collections' },
+    { path: '/museums', label: 'Musées', icon: 'museum' },
   ]
 
   return (
@@ -39,7 +40,7 @@ export default function TopNav() {
               key={link.path}
               to={link.path}
               className={({ isActive }) =>
-                `text-sm font-medium transition-colors ${
+                `text-sm font-medium transition-colors flex items-center gap-1.5 ${
                   isActive
                     ? 'text-accent'
                     : 'text-secondary hover:text-accent'
@@ -64,12 +65,16 @@ export default function TopNav() {
             </span>
           </button>
 
-          {/* Profile */}
+          {/* Profile with name */}
           {user && (
-            <Link to="/profile" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-sm font-medium text-bg-dark">
-                {user.email?.[0]?.toUpperCase() || 'U'}
-              </div>
+            <Link
+              to="/profile"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-secondary transition-colors"
+            >
+              <span className="material-symbols-outlined text-accent">person</span>
+              <span className="text-sm font-medium">
+                {profile?.full_name || 'Profil'}
+              </span>
             </Link>
           )}
         </div>

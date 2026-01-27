@@ -274,7 +274,7 @@ export default function ArtworkDetail() {
 
           {/* Curatorial note */}
           <Textarea
-            label="Note curatoriale"
+            label="Contexte historique"
             value={editForm.curatorial_note || ''}
             onChange={(e) => updateEditField('curatorial_note', e.target.value)}
             rows={3}

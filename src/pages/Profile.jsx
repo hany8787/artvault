@@ -26,6 +26,26 @@ export default function Profile() {
   const [saving, setSaving] = useState(false)
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false)
   const [showSignOutModal, setShowSignOutModal] = useState(false)
+  const [showLanguageModal, setShowLanguageModal] = useState(false)
+  const [selectedLanguage, setSelectedLanguage] = useState(
+    localStorage.getItem('artvault_language') || 'fr'
+  )
+
+  const LANGUAGES = [
+    { code: 'fr', name: 'Français', flag: '🇫🇷' },
+    { code: 'en', name: 'English', flag: '🇬🇧' },
+    { code: 'es', name: 'Español', flag: '🇪🇸' },
+    { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
+    { code: 'it', name: 'Italiano', flag: '🇮🇹' },
+  ]
+
+  function handleLanguageChange(langCode) {
+    setSelectedLanguage(langCode)
+    localStorage.setItem('artvault_language', langCode)
+    setShowLanguageModal(false)
+  }
+
+  const currentLanguage = LANGUAGES.find(l => l.code === selectedLanguage) || LANGUAGES[0]
 
   useEffect(() => {
     if (profile) {
@@ -284,6 +304,7 @@ export default function Profile() {
           </button>
 
           <button
+            onClick={() => setShowLanguageModal(true)}
             className="w-full px-6 py-4 text-left hover:bg-secondary transition-colors flex items-center justify-between border-t border-primary/10"
           >
             <div className="flex items-center gap-3">
@@ -291,7 +312,7 @@ export default function Profile() {
               <span>Langue</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-secondary text-sm">Français</span>
+              <span className="text-secondary text-sm">{currentLanguage.flag} {currentLanguage.name}</span>
               <span className="material-symbols-outlined text-secondary">chevron_right</span>
             </div>
           </button>
@@ -383,6 +404,46 @@ export default function Profile() {
         cancelText="Annuler"
         danger
       />
+
+      {/* Language Selection Modal */}
+      {showLanguageModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowLanguageModal(false)}>
+          <div className="bg-bg-light dark:bg-bg-dark rounded-xl shadow-xl max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-primary/10">
+              <h3 className="font-display text-xl italic text-center">Choisir la langue</h3>
+            </div>
+            <div className="p-2">
+              {LANGUAGES.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => handleLanguageChange(lang.code)}
+                  className={`w-full px-4 py-3 text-left rounded-lg flex items-center justify-between transition-colors ${
+                    selectedLanguage === lang.code
+                      ? 'bg-accent/10 text-accent'
+                      : 'hover:bg-secondary'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">{lang.flag}</span>
+                    <span>{lang.name}</span>
+                  </div>
+                  {selectedLanguage === lang.code && (
+                    <span className="material-symbols-outlined text-accent">check</span>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="p-4 border-t border-primary/10">
+              <button
+                onClick={() => setShowLanguageModal(false)}
+                className="btn btn-outline w-full"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -10,7 +10,7 @@ const ANALYSIS_STEPS = [
   'Identification de l\'œuvre...',
   'Reconnaissance de l\'artiste...',
   'Récupération des métadonnées...',
-  'Génération des notes curatoriales...'
+  'Rédaction du contexte historique...'
 ]
 
 export default function Scan() {
@@ -296,9 +296,15 @@ export default function Scan() {
         />
 
         {/* Camera / Image View */}
-        <div className="flex-1 relative overflow-hidden">
+        <div className="flex-1 relative overflow-hidden flex items-center justify-center">
           {imageData ? (
-            <img src={imageData} alt="Captured" className="w-full h-full object-cover" />
+            <div className="relative w-full h-full flex items-center justify-center p-8">
+              <img
+                src={imageData}
+                alt="Captured"
+                className="max-h-[60vh] max-w-full object-contain rounded-xl shadow-2xl"
+              />
+            </div>
           ) : (
             <video
               ref={videoRef}
@@ -398,9 +404,9 @@ export default function Scan() {
                 disabled={!cameraActive}
                 className="relative group"
               >
-                <div className="absolute inset-0 rounded-full bg-accent/30 animate-pulse-soft scale-110" />
-                <div className="relative w-20 h-20 rounded-full bg-accent flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform group-disabled:opacity-50">
-                  <div className="w-16 h-16 rounded-full border-4 border-black/20" />
+                <div className="absolute inset-0 rounded-full bg-white/30 animate-pulse-soft scale-125" />
+                <div className="relative w-20 h-20 rounded-full bg-white border-4 border-accent flex items-center justify-center shadow-xl group-hover:scale-105 transition-transform group-disabled:opacity-50">
+                  <div className="w-14 h-14 rounded-full bg-accent" />
                 </div>
               </button>
 
@@ -680,13 +686,13 @@ export default function Scan() {
               </div>
 
               <div>
-                <label className="label text-secondary mb-2 block">Note curatoriale</label>
+                <label className="label text-secondary mb-2 block">Contexte historique</label>
                 <textarea
                   value={formData.curatorial_note}
                   onChange={(e) => updateField('curatorial_note', e.target.value)}
                   rows={3}
                   className="input textarea font-serif italic"
-                  placeholder="Votre réflexion personnelle sur cette œuvre..."
+                  placeholder="Contexte historique et artistique de l'œuvre..."
                 />
               </div>
             </div>
