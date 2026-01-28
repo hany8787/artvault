@@ -19,6 +19,36 @@ const BATCH_STATUS = {
   ERROR: 'error'
 }
 
+/**
+ * Parse year from various formats to integer or null
+ * Handles: "1889", "vers 1680-1690", "c. 1500", "Inconnu", etc.
+ */
+function parseYear(yearValue) {
+  if (!yearValue) return null
+  
+  // If already a number, return it
+  if (typeof yearValue === 'number') {
+    return Number.isInteger(yearValue) ? yearValue : null
+  }
+  
+  // Convert to string and clean
+  const yearStr = String(yearValue).trim()
+  
+  // Try to extract first 4-digit year from string
+  const match = yearStr.match(/\b(1[0-9]{3}|20[0-2][0-9])\b/)
+  if (match) {
+    return parseInt(match[1], 10)
+  }
+  
+  // If it's just a number string, parse it
+  const parsed = parseInt(yearStr, 10)
+  if (!isNaN(parsed) && parsed > 0 && parsed < 2100) {
+    return parsed
+  }
+  
+  return null
+}
+
 export default function BatchScanMode({ onExit }) {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -217,6 +247,9 @@ export default function BatchScanMode({ onExit }) {
           }
         }
 
+        // Parse year safely - convert text like "vers 1680-1690" to integer
+        const parsedYear = parseYear(capture.data.year)
+
         // Insert artwork
         const { error: insertError } = await supabase
           .from('artworks')
@@ -226,7 +259,7 @@ export default function BatchScanMode({ onExit }) {
             title: capture.data.title || 'Sans titre',
             artist: capture.data.artist || null,
             artist_dates: capture.data.artist_dates || null,
-            year: capture.data.year || null,
+            year: parsedYear,
             period: capture.data.period || null,
             style: capture.data.style || null,
             medium: capture.data.medium || null,
