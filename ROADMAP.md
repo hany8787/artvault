@@ -2,7 +2,7 @@
 
 > **Vision** : L'application de référence pour découvrir, scanner et collectionner l'art
 > **Positionnement** : Whart + Scanner IA = ArtVault
-> **Dernière mise à jour** : 27 janvier 2026
+> **Dernière mise à jour** : 28 janvier 2026
 
 ---
 
@@ -28,14 +28,6 @@
                       EXCLUSIF
 ```
 
-### Différenciation vs Concurrence
-
-| App | Avant | Pendant | Après |
-|-----|-------|---------|-------|
-| **Whart** | ✅ | ❌ | ❌ |
-| **Google Arts** | ✅ | ⚠️ (basique) | ❌ |
-| **ArtVault** | ✅ | ✅✅ (IA) | ✅ |
-
 ---
 
 ## 📅 Phases de développement
@@ -57,189 +49,152 @@
 
 ---
 
-### Phase 1 : Polish & PWA (Février 2026)
+### Phase 1 : Filtres & Affiliation ✅ (Janvier 2026)
 
-**Objectif : Application installable et utilisable offline**
+**Statut : COMPLÉTÉ**
 
-#### 1.1 PWA Complète
-- [ ] `manifest.json` complet avec tous les icons
+- [x] Modal filtres plein écran style Whart
+- [x] 30+ catégories organisées hiérarchiquement
+- [x] Compteur résultats dynamique
+- [x] Chips de filtres actifs avec suppression
+- [x] Utilitaire génération liens affiliation Amazon
+- [x] Composants AffiliateLinks et AffiliateButton
+
+---
+
+### Phase 2 : Audio Guide IA ✅ (Janvier 2026)
+
+**Statut : COMPLÉTÉ**
+
+- [x] Hook `useSpeech` pour Web Speech API (TTS gratuit)
+- [x] Service `audioGuide.js` avec génération Claude
+- [x] Edge Function `generate-audio-text` déployée
+- [x] Composant `AudioGuidePlayer` avec design dépliable
+- [x] 3 niveaux de narration : Enfant, Amateur, Expert
+- [x] Contrôles play/pause/stop + barre de progression
+- [x] Cache local des textes générés
+- [x] Intégration dans ArtworkDetail.jsx
+
+**Stack Audio Guide :**
+- Génération texte : Claude Sonnet 4 via Edge Function
+- Text-to-Speech : Web Speech API (navigateur)
+- Upgrade possible : ElevenLabs, Google Cloud TTS
+
+---
+
+### Phase 3 : Scanner Avancé 🚧 (Février 2026)
+
+**Objectif : Scanner plus intelligent et polyvalent**
+
+#### 3.1 Auto-crop intelligent
+- [ ] Détection des bords de l'œuvre (OpenCV.js ou TensorFlow.js)
+- [ ] Crop automatique avant envoi à Claude
+- [ ] Preview avec ajustement manuel
+- [ ] Correction de perspective
+
+#### 3.2 OCR Cartel automatique
+- [ ] Détection du cartel dans l'image
+- [ ] Extraction texte via Google Cloud Vision ou Tesseract.js
+- [ ] Pré-remplissage des champs (titre, artiste, année)
+- [ ] Fusion intelligente OCR + Claude Vision
+
+#### 3.3 Scan batch (multiple)
+- [ ] Mode "visite" : scanner plusieurs œuvres à la suite
+- [ ] File d'attente avec aperçu
+- [ ] Traitement en arrière-plan
+- [ ] Notification quand tout est traité
+
+---
+
+### Phase 4 : Collection Avancée 🔮 (Mars 2026)
+
+**Objectif : Organisation et visualisation enrichies**
+
+#### 4.1 Tri par couleur dominante
+- [ ] Extraction couleur dominante à l'upload (Color Thief)
+- [ ] Stockage dans table artworks (champ `dominant_color`)
+- [ ] Vue "palette" dans Collection
+- [ ] Filtre par gamme de couleurs
+
+#### 4.2 Timeline chronologique
+- [ ] Vue alternative : frise chronologique
+- [ ] Regroupement par siècle/décennie
+- [ ] Navigation swipe horizontal
+- [ ] Zoom sur période
+
+#### 4.3 Import depuis Google Arts & Culture
+- [ ] Connexion compte Google
+- [ ] Import des favoris Google Arts
+- [ ] Matching avec notre base
+- [ ] Enrichissement IA si nécessaire
+
+---
+
+### Phase 5 : IA Avancée 🔮 (Avril 2026)
+
+**Objectif : Expériences IA différenciantes**
+
+#### 5.1 Recommandations "Vous aimerez aussi"
+- [ ] Analyse des goûts utilisateur (périodes, styles, artistes)
+- [ ] Suggestions basées sur la collection
+- [ ] Intégration API musées (Europeana, Rijksmuseum)
+- [ ] Section "Découvertes" sur Home
+
+#### 5.2 Analyse stylistique comparative
+- [ ] Comparer 2 œuvres côte à côte
+- [ ] Analyse des similarités/différences par Claude
+- [ ] Graphe d'influences (artiste A → artiste B)
+- [ ] "Cette œuvre vous rappelle..." sur fiche détail
+
+#### 5.3 Chatbot expert art
+- [ ] Interface chat sur fiche artwork
+- [ ] Questions libres sur l'œuvre
+- [ ] Historique des conversations
+- [ ] Mode "quiz" pour apprendre
+
+---
+
+### Phase 6 : PWA & Performance 🔮 (Mai 2026)
+
+- [ ] manifest.json complet avec tous les icons
 - [ ] Service Worker pour cache offline
-- [ ] Splash screen personnalisé
-- [ ] Installation prompt optimisé
 - [ ] Mode offline (consultation collection)
-
-#### 1.2 Performance
 - [ ] Lazy loading images
 - [ ] Compression images avant upload
-- [ ] Skeleton loaders
-- [ ] Optimisation bundle (code splitting)
-
-#### 1.3 UX Polish
-- [ ] Animations transitions entre pages
-- [ ] Pull-to-refresh sur collection
-- [ ] Swipe actions sur cards
-- [ ] Onboarding premier lancement
-- [ ] Empty states améliorés
-
-#### 1.4 Tests
-- [ ] Tests sur iPhone réel
-- [ ] Tests sur Android réel
-- [ ] Tests tablette
 - [ ] Lighthouse score > 90
 
-**KPI Phase 1** : PWA installable, score Lighthouse > 90
-
 ---
 
-### Phase 2 : Filtres Avancés & Géolocalisation (Mars 2026)
+### Phase 7 : Monétisation 🔮 (Été 2026)
 
-**Objectif : UX de filtrage professionnelle style Whart**
-
-#### 2.1 Filtres hiérarchiques Collection
-- [ ] Modal filtres plein écran
-- [ ] 30+ catégories organisées hiérarchiquement
-- [ ] Compteur résultats dynamique
-- [ ] Recherche dans les filtres
-
-#### 2.2 Expositions "Autour de vous"
-- [ ] Géolocalisation sur page Actualités
-- [ ] Section "Autour de vous" avec distance
-- [ ] Vue carte avec clusters
-- [ ] Toggle Liste/Carte
-
-#### 2.3 Fiche Exposition enrichie
-- [ ] Bouton "Itinéraire" (Google Maps)
-- [ ] Section "What else?" (expos similaires)
-- [ ] Favoris exposition
-
-**KPI Phase 2** : Filtres fonctionnels, géoloc opérationnelle
-
----
-
-### Phase 3 : Croissance & Métriques (Avril 2026)
-
-**Objectif : 1000 utilisateurs actifs**
-
-#### 3.1 Analytics
-- [ ] Intégration Mixpanel ou Amplitude
-- [ ] Tracking événements clés
-- [ ] Dashboard métriques
-
-#### 3.2 Acquisition
-- [ ] Landing page marketing
-- [ ] SEO (pages publiques expos)
-- [ ] Partage social optimisé (Open Graph)
-
-#### 3.3 Rétention
-- [ ] Notifications push
-- [ ] Email digest hebdomadaire
-
-**KPI Phase 3** : 1000 MAU, 100 scans/jour
-
----
-
-### Phase 4 : Monétisation (Mai-Juin 2026)
-
-**Objectif : Premiers revenus**
-
-#### 4.1 Freemium
-- [ ] Limite scans gratuits (10/mois)
-- [ ] Plans tarifaires (Free / Premium 4,99€ / Prestige 9,99€)
+- [ ] Freemium (limite scans gratuits)
+- [ ] Plans tarifaires (Premium 4,99€ / Prestige 9,99€)
 - [ ] Intégration Stripe
-
-#### 4.2 Features Premium
-- [ ] Collections multiples
-- [ ] Export PDF catalogue
-- [ ] Mode offline complet
-- [ ] Scan illimité
-
-#### 4.3 Affiliation
-- [ ] Liens Amazon livres d'art
-- [ ] Boutiques musées partenaires
-- [ ] Reproductions d'œuvres
-
-**KPI Phase 4** : 50 abonnés payants, MRR 250€
-
----
-
-### Phase 5 : Partenariats Musées (Été 2026)
-
-**Objectif : Premiers partenariats B2B**
-
-- [ ] Deck commercial PDF
-- [ ] Pilotes gratuits avec Paris Musées
-- [ ] Dashboard insights pour musées
-- [ ] White-label option
-
-**KPI Phase 5** : 2 partenariats pilotes signés
-
----
-
-### Phase 6 : Billetterie (Automne 2026)
-
-- [ ] Boutons "Réserver" → liens externes
-- [ ] Tracking clics affiliation
-- [ ] Billetterie intégrée (si traction)
-
----
-
-### Phase 7 : Expansion (2027)
-
-- [ ] Couverture France (Lyon, Marseille, Bordeaux)
-- [ ] i18n (EN, ES, DE, IT)
-- [ ] International (Londres, Amsterdam)
-
----
-
-## 🎨 Features backlog
-
-### Scanner
-- [ ] Auto-crop intelligent
-- [ ] OCR cartel automatique
-- [ ] Scan batch (multiple)
-
-### Collection
-- [ ] Tri par couleur dominante
-- [ ] Timeline chronologique
-- [ ] Import depuis Google Arts
-
-### IA avancée
-- [ ] Audio guide IA personnalisé
-- [ ] Recommandations "Vous aimerez aussi"
-- [ ] Analyse stylistique comparative
-
-### Social
-- [ ] Profils publics
-- [ ] Collections partagées
-- [ ] Commentaires
-
-### Gamification
-- [ ] Badges
-- [ ] Streaks de visite
-- [ ] Leaderboards
+- [ ] Affiliation Amazon active
+- [ ] Partenariats musées
 
 ---
 
 ## 📊 Métriques cibles
 
-| Métrique | Phase 1 | Phase 3 | Phase 5 |
-|----------|---------|---------|---------|
+| Métrique | Phase 2 | Phase 5 | Phase 7 |
+|----------|---------|---------|----------|
 | MAU | 100 | 1 000 | 5 000 |
 | Scans/jour | 10 | 100 | 500 |
 | Rétention J7 | 20% | 30% | 40% |
 
 ---
 
-## 💡 Inspirations
+## 🛠 Stack Technique Actuelle
 
-| App | Ce qu'on prend |
-|-----|----------------|
-| **Whart** | Filtres hiérarchiques, UX expos, "Autour de vous" |
-| **Shazam** | Instantanéité du scan |
-| **Pinterest** | Collections visuelles |
-| **Spotify Wrapped** | Récap annuel |
-| **Duolingo** | Gamification |
+| Composant | Technologie |
+|-----------|-------------|
+| Frontend | React 18 + Vite + Tailwind |
+| Backend | Supabase (Auth, DB, Storage, Edge Functions) |
+| IA Identification | Claude Vision (claude-sonnet-4) |
+| IA Audio Guide | Claude Sonnet 4 + Web Speech API |
+| Déploiement | Vercel / Dokploy |
 
 ---
 
-*Document vivant - Mise à jour régulière*
+*Document vivant - Dernière modification : 28 janvier 2026*

@@ -1,8 +1,8 @@
 # ArtVault - Contexte Claude
 
-> **Dernière mise à jour** : 27 janvier 2026
-> **Version** : 0.3.0
-> **Statut** : MVP en développement
+> **Dernière mise à jour** : 28 janvier 2026
+> **Version** : 0.4.0
+> **Statut** : Phase 2 complétée (Audio Guide)
 
 ---
 
@@ -12,6 +12,7 @@
 1. **Scanner** des œuvres d'art avec leur téléphone
 2. **Identifier** automatiquement l'œuvre via Claude Vision AI
 3. **Collecter** et organiser leurs découvertes artistiques
+4. **Écouter** des audio guides IA personnalisés
 
 ### Stack Technique
 | Technologie | Usage |
@@ -20,11 +21,12 @@
 | Tailwind CSS | Styling |
 | Supabase | Auth, PostgreSQL, Storage, Edge Functions |
 | Claude Vision API | Identification des œuvres |
-| PWA | Installation mobile (prévu) |
+| Claude Sonnet 4 | Génération texte audio guide |
+| Web Speech API | Text-to-Speech (gratuit) |
 
 ### Design System
 - **Mode** : Dark mode par défaut
-- **Fond** : `#221e10` (brun sombre)
+- **Fond** : `#221e10` (brun sombre) ou neutral-900
 - **Accent** : `#f2b90d` (or)
 - **Typo titres** : Newsreader (serif, italic)
 - **Typo UI** : DM Sans (sans-serif)
@@ -37,48 +39,63 @@
 artvault/
 ├── src/
 │   ├── components/
-│   │   ├── ui/              # Composants réutilisables
-│   │   │   ├── Card.jsx     # ArtworkCard, MuseumCard
+│   │   ├── audio/
+│   │   │   └── AudioGuide.jsx      # ✅ Player audio dépliable
+│   │   ├── ui/
+│   │   │   ├── Card.jsx
 │   │   │   ├── FavoriteButton.jsx
-│   │   │   ├── Input.jsx
-│   │   │   ├── Modal.jsx
-│   │   │   └── Loader.jsx
-│   │   ├── MuseumAutocomplete.jsx
-│   │   └── Layout.jsx       # Header + Bottom Nav
+│   │   │   └── ...
+│   │   └── Layout.jsx
+│   ├── hooks/
+│   │   └── useSpeech.js            # ✅ Hook Web Speech API
+│   ├── services/
+│   │   └── audioGuide.js           # ✅ Service génération texte
 │   ├── pages/
-│   │   ├── Home.jsx         # Page d'accueil style app
-│   │   ├── Scan.jsx         # Scanner + Claude Vision
-│   │   ├── Collection.jsx   # Grille des œuvres
-│   │   ├── ArtworkDetail.jsx # Fiche détaillée
-│   │   ├── Museums.jsx      # Liste des musées
-│   │   ├── MuseumDetail.jsx
-│   │   ├── News.jsx         # Expositions
-│   │   └── Profile.jsx
-│   ├── contexts/
-│   │   ├── AuthContext.jsx
-│   │   └── ThemeContext.jsx
+│   │   ├── Home.jsx
+│   │   ├── Scan.jsx
+│   │   ├── Collection.jsx
+│   │   ├── ArtworkDetail.jsx       # ✅ Intègre AudioGuidePlayer
+│   │   └── ...
 │   └── lib/
 │       └── supabase.js
 ├── supabase/
 │   └── functions/
-│       ├── identify-artwork/   # Claude Vision API
-│       └── get-exhibitions/    # Paris Musées API
+│       ├── enrich-artwork/         # Claude Vision
+│       └── generate-audio-text/    # ✅ Audio Guide
 └── public/
-    ├── manifest.json
-    └── icons/
 ```
 
 ---
 
-## 🗄️ Base de Données (Supabase)
+## ✅ Fonctionnalités Implémentées
 
-### Tables principales
-- **profiles** : Extension de auth.users
-- **artworks** : Œuvres de la collection (titre, artiste, musée, image, etc.)
-- **museums** : Base des musées avec coordonnées et métadonnées
-- **scan_history** : Historique des scans (optionnel)
+### Core (Phase 0)
+- [x] Auth (login/register Supabase)
+- [x] Scanner avec caméra ou upload
+- [x] Identification via Claude Vision
+- [x] Collection avec grille et filtres
+- [x] Fiche artwork détaillée
+- [x] CRUD complet
+- [x] Favoris
 
-### Champs importants `artworks`
+### Phase 1 : Filtres
+- [x] Modal filtres hiérarchiques (30+ catégories)
+- [x] Chips filtres actifs
+- [x] Affiliation Amazon (composants prêts)
+
+### Phase 2 : Audio Guide IA ✅
+- [x] `useSpeech.js` : Hook TTS avec Web Speech API
+- [x] `audioGuide.js` : Service génération texte Claude
+- [x] `AudioGuide.jsx` : Composant player dépliable
+- [x] Edge Function `generate-audio-text`
+- [x] 3 niveaux : Enfant (6-12 ans), Amateur, Expert
+- [x] Intégration dans ArtworkDetail.jsx
+
+---
+
+## 🗄️ Base de Données
+
+### Table `artworks`
 ```sql
 id, user_id, title, artist, artist_dates, year,
 period, style, type, genre, medium,
@@ -89,111 +106,58 @@ is_favorite, collection_id,
 confidence_score, ai_raw_response
 ```
 
----
-
-## ✅ Fonctionnalités Implémentées
-
-### Core
-- [x] Auth (login/register Supabase)
-- [x] Scanner avec caméra ou upload
-- [x] Identification via Claude Vision (Edge Function)
-- [x] Collection avec grille et filtres
-- [x] Fiche artwork détaillée
-- [x] CRUD complet (ajout, modification, suppression)
-
-### Features récentes (v0.3.0)
-- [x] **Favoris** : Bouton ❤️ sur cards et détail, filtre rapide
-- [x] **Home refonte** : Style app mobile, scroll horizontal, scanner hero
-- [x] **Barre d'actions artwork** : Déplacée en bas de l'image avec fond opaque
-- [x] **MuseumAutocomplete** : z-index corrigé, style opaque
-
-### API & Intégrations
-- [x] Claude Vision pour identification
-- [x] Paris Musées API (expositions via Edge Function)
-- [x] Table `museums` avec autocomplete
+### Edge Functions déployées
+| Fonction | Usage | ID |
+|----------|-------|----|
+| `enrich-artwork` | Identification Claude Vision | - |
+| `get-exhibitions` | Paris Open Data | - |
+| `generate-audio-text` | Audio Guide IA | 1a710eec-1bb1-48df-a174-52eb9b9df4ac |
 
 ---
 
-## 🐛 Bugs Corrigés (Session 27/01/2026)
+## 🔧 Configuration Audio Guide
 
-1. **MuseumAutocomplete invisible** (blanc sur blanc en light mode)
-   - Fix : Classes thème au lieu de hardcoded colors
+### Niveaux de narration
+| Niveau | Durée | Tokens | Style |
+|--------|-------|--------|-------|
+| Enfant | 30-45s | ~100 mots | Simple, questions, anecdotes |
+| Amateur | 45-60s | ~150 mots | Contexte historique, accessible |
+| Expert | 60-90s | ~200 mots | Analyse technique, érudit |
 
-2. **Bouton Enregistrer qui ne marchait pas** (Scan.jsx)
-   - Fix : Parse de `year` en integer, gestion des undefined
-
-3. **Latence favoris** (clic → filtre ne réagit pas)
-   - Fix : FavoriteButton en composant contrôlé avec useEffect sync
-
-4. **Boutons illisibles sur fiche artwork**
-   - Fix : Déplacés en bas de l'image hero avec fond opaque
-
----
-
-## 📋 Prochaines Étapes
-
-### Feature #2 : PWA
-- [ ] manifest.json complet
-- [ ] Service worker pour offline
-- [ ] Splash screen
-- [ ] Installation sur écran d'accueil
-
-### Feature #3 : Partage social
-- [ ] Génération de preview image
-- [ ] Meta tags Open Graph
-- [ ] Boutons partage (déjà présents basiquement)
-
-### Feature #4 : Multi-collections
-- [ ] Table `collections`
-- [ ] UI pour créer/gérer des collections
-- [ ] Assigner une œuvre à une collection
-
-### Feature #5 : Auto-crop Scanner
-- [ ] Détection des bords de l'œuvre
-- [ ] Crop automatique avant analyse
+### Upgrade TTS possible
+- **Actuel** : Web Speech API (gratuit, voix navigateur)
+- **Option 1** : Google Cloud TTS (~$4/million caractères)
+- **Option 2** : ElevenLabs (voix ultra-réalistes, ~$5/mois)
+- **Option 3** : OpenAI TTS (bonne qualité, ~$15/million)
 
 ---
 
-## 🔧 Commandes Utiles
+## 📋 Prochaines Phases (Backlog)
 
-```bash
-# Dev
-cd /Users/hd/Desktop/artvault
-npm run dev
+### Phase 3 : Scanner Avancé
+- [ ] Auto-crop intelligent (détection bords)
+- [ ] OCR cartel automatique
+- [ ] Scan batch (multiple œuvres)
 
-# Build
-npm run build
+### Phase 4 : Collection Avancée
+- [ ] Tri par couleur dominante
+- [ ] Timeline chronologique
+- [ ] Import Google Arts & Culture
 
-# Deploy (si Dokploy configuré)
-git push origin main
-```
-
----
-
-## 📝 Notes pour Claude Code
-
-Quand tu reprends ce projet :
-
-1. **Lis ce fichier** pour comprendre le contexte
-2. **Vérifie** `artvault-changelog.md` pour l'historique
-3. **Consulte** `artvault-design-tokens.md` pour le style
-4. **Le repo GitHub** : https://github.com/hany8787/artvault
-
-### Conventions
-- Composants React : PascalCase
-- Hooks : camelCase avec `use`
-- Classes Tailwind : thème-aware (`text-primary dark:text-white`)
-- Supabase : toujours vérifier les erreurs
-
-### Points d'attention
-- Le champ `year` dans artworks est INTEGER (toujours parser)
-- Les images sont stockées dans Supabase Storage bucket `artworks`
-- L'Edge Function `identify-artwork` utilise la clé Anthropic stockée en secret
+### Phase 5 : IA Avancée
+- [ ] Recommandations "Vous aimerez aussi"
+- [ ] Analyse stylistique comparative
+- [ ] Chatbot expert art
 
 ---
 
 ## 🔗 Liens Utiles
 
-- **Supabase Dashboard** : https://supabase.com/dashboard/project/dzjgilplznhhwwitjztf
-- **GitHub Repo** : https://github.com/hany8787/artvault
+- **GitHub** : https://github.com/hany8787/artvault
+- **Supabase** : https://supabase.com/dashboard/project/dzjgilplznhhwwitjztf
 - **Design Tokens** : voir `artvault-design-tokens.md`
+- **Roadmap** : voir `ROADMAP.md`
+
+---
+
+*Document généré le 28 janvier 2026*
