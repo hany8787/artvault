@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { ArtworkCard } from '../components/ui/Card'
@@ -98,8 +98,13 @@ const VIEW_MODES = [
 
 export default function Collection() {
   const { user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [artworks, setArtworks] = useState([])
   const [loading, setLoading] = useState(true)
+
+  // Folders/collections
+  const [collections, setCollections] = useState([])
+  const [activeCollectionId, setActiveCollectionId] = useState(searchParams.get('collectionId') || null)
 
   // View states
   const [viewMode, setViewMode] = useState('grid') // grid, list, timeline, colors
@@ -119,7 +124,37 @@ export default function Collection() {
 
   useEffect(() => {
     fetchArtworks()
+    fetchCollections()
   }, [user])
+
+  // Sync URL param with active collection
+  useEffect(() => {
+    const urlCollectionId = searchParams.get('collectionId')
+    if (urlCollectionId !== activeCollectionId) {
+      setActiveCollectionId(urlCollectionId || null)
+    }
+  }, [searchParams])
+
+  async function fetchCollections() {
+    if (!user) return
+    const { data } = await supabase
+      .from('collections')
+      .select('*, artworks:artworks(count)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+    setCollections(data || [])
+  }
+
+  function selectCollection(collectionId) {
+    if (collectionId === activeCollectionId) {
+      // Deselect
+      setActiveCollectionId(null)
+      setSearchParams({})
+    } else {
+      setActiveCollectionId(collectionId)
+      setSearchParams({ collectionId })
+    }
+  }
 
   async function fetchArtworks() {
     if (!user) return
@@ -150,6 +185,11 @@ export default function Collection() {
   // Filter and sort artworks
   const filteredArtworks = useMemo(() => {
     let result = artworks.filter(artwork => {
+      // Collection/folder filter
+      if (activeCollectionId) {
+        if (artwork.collection_id !== activeCollectionId) return false
+      }
+
       // Search query
       if (searchQuery) {
         const query = searchQuery.toLowerCase()
@@ -226,7 +266,7 @@ export default function Collection() {
     }
 
     return result
-  }, [artworks, searchQuery, selectedPeriods, selectedTypes, selectedMuseum, selectedArtist, sortBy, favoritesOnly])
+  }, [artworks, searchQuery, selectedPeriods, selectedTypes, selectedMuseum, selectedArtist, sortBy, favoritesOnly, activeCollectionId])
 
   // Count active filters
   const activeFilterCount = selectedPeriods.length + selectedTypes.length +
@@ -249,10 +289,14 @@ export default function Collection() {
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="font-display text-3xl md:text-4xl italic mb-2">
-              Ma Collection
+              {activeCollectionId
+                ? collections.find(c => c.id === activeCollectionId)?.name || 'Dossier'
+                : 'Ma Collection'}
             </h1>
             <p className="text-secondary">
-              {artworks.length} œuvre{artworks.length > 1 ? 's' : ''}
+              {activeCollectionId
+                ? `${filteredArtworks.length} œuvre${filteredArtworks.length > 1 ? 's' : ''} dans ce dossier`
+                : `${artworks.length} œuvre${artworks.length > 1 ? 's' : ''}`}
             </p>
           </div>
 
@@ -348,6 +392,42 @@ export default function Collection() {
           </div>
         )}
       </header>
+
+      {/* Dossiers Section */}
+      {collections.length > 0 && (
+        <div className="px-4 max-w-7xl mx-auto mb-6">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="material-symbols-outlined text-lg text-secondary">folder</span>
+            <h2 className="text-sm font-medium text-secondary uppercase tracking-wide">Dossiers</h2>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+            {/* "Tout" chip */}
+            <button
+              onClick={() => selectCollection(null)}
+              className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                !activeCollectionId
+                  ? 'bg-accent text-bg-dark'
+                  : 'bg-white/10 text-secondary hover:bg-white/20'
+              }`}
+            >
+              Tout ({artworks.length})
+            </button>
+            {collections.map(col => (
+              <button
+                key={col.id}
+                onClick={() => selectCollection(col.id)}
+                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  activeCollectionId === col.id
+                    ? 'bg-accent text-bg-dark'
+                    : 'bg-white/10 text-secondary hover:bg-white/20'
+                }`}
+              >
+                {col.name} ({col.artworks?.[0]?.count || 0})
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="px-4 max-w-7xl mx-auto">
