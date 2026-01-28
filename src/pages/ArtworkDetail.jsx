@@ -10,6 +10,7 @@ import { ArtworkCard } from '../components/ui/Card'
 import MuseumAutocomplete from '../components/MuseumAutocomplete'
 import SuggestionInput from '../components/ui/SuggestionInput'
 import AddToCollectionModal from '../components/ui/AddToCollectionModal'
+import { AudioGuidePlayer } from '../components/audio/AudioGuide'
 
 export default function ArtworkDetail() {
   const { id } = useParams()
@@ -455,6 +456,11 @@ export default function ArtworkDetail() {
           </span>
           <div className="flex-1 h-px bg-gradient-to-l from-transparent to-accent/50" />
         </div>
+      </section>
+
+      {/* Audio Guide Player - Carte dédiée */}
+      <section className="max-w-2xl mx-auto px-4 pb-8">
+        <AudioGuidePlayer artwork={artwork} />
       </section>
 
       {/* Content - Editorial layout */}
