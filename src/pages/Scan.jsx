@@ -10,6 +10,21 @@ import { detectArtworkBounds, applyCrop } from '../utils/autoCrop'
 import { extractText, parseCartelText } from '../utils/ocrCartel'
 import { getDominantColor } from '../utils/colorExtractor'
 
+// Parse year string to integer (handles "1843-1845", "vers 1680", etc.)
+function parseYear(yearValue) {
+  if (!yearValue) return null
+  if (typeof yearValue === 'number') {
+    return Number.isInteger(yearValue) ? yearValue : null
+  }
+  const yearStr = String(yearValue).trim()
+  if (!yearStr) return null
+  const match = yearStr.match(/\b(1[0-9]{3}|20[0-2][0-9])\b/)
+  if (match) return parseInt(match[1], 10)
+  const parsed = parseInt(yearStr, 10)
+  if (!isNaN(parsed) && parsed > 0 && parsed < 2100) return parsed
+  return null
+}
+
 /**
  * Scanner Workflow States:
  * 1. artwork - Capture/select artwork photo
@@ -507,7 +522,7 @@ export default function Scan() {
           title: formData.title.trim(),
           artist: formData.artist.trim() || null,
           artist_dates: formData.artist_dates.trim() || null,
-          year: formData.year.trim() || null,
+          year: parseYear(formData.year),
           period: formData.period.trim() || null,
           style: formData.style.trim() || null,
           medium: formData.medium.trim() || null,
@@ -705,19 +720,20 @@ export default function Scan() {
               {/* Batch mode toggle */}
               <button
                 onClick={() => setScanMode(SCAN_MODES.BATCH)}
-                className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/10 backdrop-blur-sm text-white text-xs font-medium"
                 title="Mode visite (batch)"
               >
-                <span className="material-symbols-outlined">burst_mode</span>
+                <span className="material-symbols-outlined text-lg">burst_mode</span>
+                <span>Batch</span>
               </button>
             </div>
 
             <ProgressIndicator />
           </div>
 
-          {/* Viewfinder */}
+          {/* Viewfinder - pushed down to avoid header overlap */}
           {!artworkImageData && cameraActive && (
-            <div className="absolute inset-16 md:inset-24 pointer-events-none">
+            <div className="absolute top-36 left-10 right-10 bottom-32 md:top-40 md:left-24 md:right-24 md:bottom-24 pointer-events-none">
               <div className="viewfinder-corner top-left border-t-2 border-l-2 border-accent" />
               <div className="viewfinder-corner top-right border-t-2 border-r-2 border-accent" />
               <div className="viewfinder-corner bottom-left border-b-2 border-l-2 border-accent" />

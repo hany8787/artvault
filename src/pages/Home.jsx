@@ -172,6 +172,37 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Comment ça marche - Compact */}
+      <section className="px-4 py-6">
+        <div className="max-w-lg mx-auto">
+          <h2 className="font-display text-xl text-primary dark:text-white mb-4 text-center">Comment ça marche</h2>
+
+          <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
+            <div className="flex-shrink-0 w-40 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 text-center">
+              <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-accent/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-xl text-accent">photo_camera</span>
+              </div>
+              <h3 className="font-medium text-sm text-primary dark:text-white mb-1">Photographiez</h3>
+              <p className="text-xs text-secondary">Capturez l'œuvre</p>
+            </div>
+            <div className="flex-shrink-0 w-40 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 text-center">
+              <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                <span className="material-symbols-outlined text-xl text-purple-500">auto_awesome</span>
+              </div>
+              <h3 className="font-medium text-sm text-primary dark:text-white mb-1">Identifiez</h3>
+              <p className="text-xs text-secondary">L'IA reconnaît</p>
+            </div>
+            <div className="flex-shrink-0 w-40 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 text-center">
+              <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <span className="material-symbols-outlined text-xl text-blue-500">collections</span>
+              </div>
+              <h3 className="font-medium text-sm text-primary dark:text-white mb-1">Collectionnez</h3>
+              <p className="text-xs text-secondary">Votre galerie</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Ma Collection - Quick Stats */}
       <section className="px-4 py-6">
         <div className="max-w-lg mx-auto">
@@ -363,41 +394,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Comment ça marche - Compact */}
-      <section className="px-4 py-6">
-        <div className="max-w-lg mx-auto">
-          <h2 className="font-display text-xl text-primary dark:text-white mb-4 text-center">Comment ça marche</h2>
-          
-          <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
-            {/* Step 1 */}
-            <div className="flex-shrink-0 w-40 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 text-center">
-              <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-accent/10 flex items-center justify-center">
-                <span className="material-symbols-outlined text-xl text-accent">photo_camera</span>
-              </div>
-              <h3 className="font-medium text-sm text-primary dark:text-white mb-1">Photographiez</h3>
-              <p className="text-xs text-secondary">Capturez l'œuvre</p>
-            </div>
-
-            {/* Step 2 */}
-            <div className="flex-shrink-0 w-40 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 text-center">
-              <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                <span className="material-symbols-outlined text-xl text-purple-500">auto_awesome</span>
-              </div>
-              <h3 className="font-medium text-sm text-primary dark:text-white mb-1">Identifiez</h3>
-              <p className="text-xs text-secondary">L'IA reconnaît</p>
-            </div>
-
-            {/* Step 3 */}
-            <div className="flex-shrink-0 w-40 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 text-center">
-              <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                <span className="material-symbols-outlined text-xl text-blue-500">collections</span>
-              </div>
-              <h3 className="font-medium text-sm text-primary dark:text-white mb-1">Collectionnez</h3>
-              <p className="text-xs text-secondary">Votre galerie</p>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   )
 }

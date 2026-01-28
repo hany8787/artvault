@@ -10,6 +10,20 @@ import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 
+// Parse year string to integer (handles "1503-1519", "vers 1680", etc.)
+function parseYear(yearValue) {
+  if (!yearValue) return null
+  if (typeof yearValue === 'number') {
+    return Number.isInteger(yearValue) ? yearValue : null
+  }
+  const yearStr = String(yearValue).trim()
+  const match = yearStr.match(/\b(1[0-9]{3}|20[0-2][0-9])\b/)
+  if (match) return parseInt(match[1], 10)
+  const parsed = parseInt(yearStr, 10)
+  if (!isNaN(parsed) && parsed > 0 && parsed < 2100) return parsed
+  return null
+}
+
 // Sample artworks from famous museums (fallback data)
 const SAMPLE_ARTWORKS = [
   {
@@ -68,6 +82,7 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
   const [selectedArtworks, setSelectedArtworks] = useState([])
   const [importing, setImporting] = useState(false)
   const [importProgress, setImportProgress] = useState(0)
+  const [importedCount, setImportedCount] = useState(0)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
@@ -98,19 +113,20 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
     setImporting(true)
     setError('')
     setImportProgress(0)
+    let count = 0
 
     try {
       for (let i = 0; i < selectedArtworks.length; i++) {
         const artwork = selectedArtworks[i]
 
-        // Check if already exists in collection
+        // Check if already exists in collection (use maybeSingle to avoid error on 0 rows)
         const { data: existing } = await supabase
           .from('artworks')
           .select('id')
           .eq('user_id', user.id)
           .eq('title', artwork.title)
           .eq('artist', artwork.artist)
-          .single()
+          .maybeSingle()
 
         if (existing) {
           console.log(`Skipping ${artwork.title} - already exists`)
@@ -118,31 +134,38 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
           continue
         }
 
-        // Insert new artwork
+        // Insert new artwork (no source field - doesn't exist in DB schema)
         const { error: insertError } = await supabase
           .from('artworks')
           .insert({
             user_id: user.id,
             title: artwork.title,
             artist: artwork.artist,
-            year: artwork.year,
+            year: parseYear(artwork.year),
             museum: artwork.museum,
             image_url: artwork.image_url,
-            description: `Importé depuis Google Arts & Culture`,
-            source: 'google_arts'
+            description: `Importé depuis Google Arts & Culture`
           })
 
         if (insertError) {
           console.error('Import error:', insertError)
+        } else {
+          count++
         }
 
         setImportProgress(((i + 1) / selectedArtworks.length) * 100)
       }
 
+      setImportedCount(count)
+
+      if (count === 0) {
+        setError('Aucune œuvre importée. Elles existent peut-être déjà dans votre collection.')
+        return
+      }
+
       setSuccess(true)
       setTimeout(() => {
         if (onImportComplete) onImportComplete()
-        if (onClose) onClose()
       }, 1500)
     } catch (err) {
       console.error('Import failed:', err)
@@ -196,7 +219,7 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
               </div>
               <p className="text-white font-medium">Import terminé !</p>
               <p className="text-secondary text-sm mt-1">
-                {selectedArtworks.length} œuvre{selectedArtworks.length > 1 ? 's' : ''} ajoutée{selectedArtworks.length > 1 ? 's' : ''}
+                {importedCount} œuvre{importedCount > 1 ? 's' : ''} ajoutée{importedCount > 1 ? 's' : ''}
               </p>
             </div>
           ) : (
