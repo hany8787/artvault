@@ -11,13 +11,63 @@ import Timeline from '../components/collection/Timeline'
 import ColorPalette from '../components/collection/ColorPalette'
 import GoogleArtsImport from '../components/collection/GoogleArtsImport'
 
-// Filter options
+// Filter options - Comprehensive art periods list
 const PERIODS = [
-  { value: 'renaissance', label: 'Renaissance' },
+  // Ancient & Medieval
+  { value: 'ancient', label: 'Antiquité' },
+  { value: 'medieval', label: 'Art Médiéval' },
+  { value: 'byzantine', label: 'Art Byzantin' },
+  { value: 'romanesque', label: 'Art Roman' },
+  { value: 'gothic', label: 'Art Gothique' },
+
+  // Renaissance & Early Modern
+  { value: 'proto-renaissance', label: 'Proto-Renaissance' },
+  { value: 'early-renaissance', label: 'Première Renaissance' },
+  { value: 'high-renaissance', label: 'Haute Renaissance' },
+  { value: 'mannerism', label: 'Maniérisme' },
+  { value: 'northern-renaissance', label: 'Renaissance du Nord' },
+
+  // Baroque & Rococo
   { value: 'baroque', label: 'Baroque' },
+  { value: 'rococo', label: 'Rococo' },
+  { value: 'classicism', label: 'Classicisme' },
+
+  // 19th Century
+  { value: 'neoclassicism', label: 'Néoclassicisme' },
   { value: 'romanticism', label: 'Romantisme' },
+  { value: 'realism', label: 'Réalisme' },
+  { value: 'pre-raphaelite', label: 'Préraphaélisme' },
   { value: 'impressionism', label: 'Impressionnisme' },
-  { value: 'modern', label: 'Art Moderne' },
+  { value: 'post-impressionism', label: 'Post-Impressionnisme' },
+  { value: 'symbolism', label: 'Symbolisme' },
+  { value: 'art-nouveau', label: 'Art Nouveau' },
+  { value: 'nabis', label: 'Nabis' },
+
+  // Early 20th Century
+  { value: 'fauvism', label: 'Fauvisme' },
+  { value: 'expressionism', label: 'Expressionnisme' },
+  { value: 'cubism', label: 'Cubisme' },
+  { value: 'futurism', label: 'Futurisme' },
+  { value: 'dadaism', label: 'Dadaïsme' },
+  { value: 'surrealism', label: 'Surréalisme' },
+  { value: 'art-deco', label: 'Art Déco' },
+  { value: 'constructivism', label: 'Constructivisme' },
+  { value: 'bauhaus', label: 'Bauhaus' },
+  { value: 'de-stijl', label: 'De Stijl' },
+
+  // Mid-20th Century
+  { value: 'abstract-expressionism', label: 'Expressionnisme Abstrait' },
+  { value: 'pop-art', label: 'Pop Art' },
+  { value: 'minimalism', label: 'Minimalisme' },
+  { value: 'conceptual-art', label: 'Art Conceptuel' },
+  { value: 'op-art', label: 'Op Art' },
+  { value: 'kinetic-art', label: 'Art Cinétique' },
+
+  // Late 20th Century & Contemporary
+  { value: 'neo-expressionism', label: 'Néo-Expressionnisme' },
+  { value: 'postmodernism', label: 'Postmodernisme' },
+  { value: 'street-art', label: 'Street Art' },
+  { value: 'digital-art', label: 'Art Numérique' },
   { value: 'contemporary', label: 'Contemporain' },
 ]
 
@@ -391,7 +441,7 @@ export default function Collection() {
         {/* Import from Google Arts */}
         <button
           onClick={() => setShowImport(true)}
-          className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center text-white hover:bg-white/20 transition-all border border-white/20"
+          className="w-12 h-12 bg-white dark:bg-white/10 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center text-primary dark:text-white hover:bg-gray-100 dark:hover:bg-white/20 transition-all border border-black/10 dark:border-white/20"
           title="Importer des œuvres"
         >
           <span className="material-symbols-outlined">download</span>
