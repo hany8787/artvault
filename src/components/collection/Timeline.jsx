@@ -8,13 +8,13 @@ import { Link } from 'react-router-dom'
 
 // Century/period data with colors
 const CENTURIES = [
-  { id: '15', label: 'XVe siècle', period: 'Renaissance', color: '#8B4513' },
-  { id: '16', label: 'XVIe siècle', period: 'Renaissance tardive', color: '#A0522D' },
-  { id: '17', label: 'XVIIe siècle', period: 'Baroque', color: '#CD853F' },
-  { id: '18', label: 'XVIIIe siècle', period: 'Rococo / Néoclassicisme', color: '#DEB887' },
-  { id: '19', label: 'XIXe siècle', period: 'Romantisme / Impressionnisme', color: '#F4A460' },
+  { id: '21', label: 'XXIe siècle', period: 'Art contemporain', color: '#FF8C00' },
   { id: '20', label: 'XXe siècle', period: 'Art moderne', color: '#D2691E' },
-  { id: '21', label: 'XXIe siècle', period: 'Art contemporain', color: '#FF8C00' }
+  { id: '19', label: 'XIXe siècle', period: 'Romantisme / Impressionnisme', color: '#F4A460' },
+  { id: '18', label: 'XVIIIe siècle', period: 'Rococo / Néoclassicisme', color: '#DEB887' },
+  { id: '17', label: 'XVIIe siècle', period: 'Baroque', color: '#CD853F' },
+  { id: '16', label: 'XVIe siècle', period: 'Renaissance tardive', color: '#A0522D' },
+  { id: '15', label: 'XVe siècle', period: 'Renaissance', color: '#8B4513' }
 ]
 
 export default function Timeline({ artworks }) {
@@ -119,7 +119,7 @@ export default function Timeline({ artworks }) {
           const centuryData = groupedArtworks[century.id]
           if (!centuryData) return null
 
-          const decades = Object.keys(centuryData.decades).sort()
+          const decades = Object.keys(centuryData.decades).sort((a, b) => b - a)
 
           return (
             <div key={century.id} className="mb-8">

@@ -32,7 +32,8 @@ export function useSpeech() {
   const [voices, setVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(null);
   const [progress, setProgress] = useState(0);
-  
+  const [currentCharIndex, setCurrentCharIndex] = useState(-1);
+
   const utteranceRef = useRef(null);
   const textRef = useRef('');
 
@@ -102,12 +103,14 @@ export function useSpeech() {
       setIsSpeaking(true);
       setIsPaused(false);
       setProgress(0);
+      setCurrentCharIndex(0);
     };
 
     utterance.onend = () => {
       setIsSpeaking(false);
       setIsPaused(false);
       setProgress(100);
+      setCurrentCharIndex(-1);
     };
 
     utterance.onerror = (event) => {
@@ -116,11 +119,12 @@ export function useSpeech() {
       setIsPaused(false);
     };
 
-    // Estimation du progrès (approximatif)
+    // Track progress and current word position
     utterance.onboundary = (event) => {
       if (event.name === 'word') {
         const progressPercent = Math.round((event.charIndex / text.length) * 100);
         setProgress(progressPercent);
+        setCurrentCharIndex(event.charIndex);
       }
     };
 
@@ -180,6 +184,7 @@ export function useSpeech() {
     isSpeaking,
     isPaused,
     progress,
+    currentCharIndex,
     voices,
     frenchVoices,
     selectedVoice,

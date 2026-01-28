@@ -3,7 +3,7 @@
  * Design premium avec carte dépliable
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSpeech } from '../../hooks/useSpeech';
 import { generateAudioText, AUDIO_LEVELS } from '../../services/audioGuide';
 
@@ -23,18 +23,34 @@ export function AudioGuidePlayer({ artwork, className = '' }) {
     isSpeaking,
     isPaused,
     progress,
+    currentCharIndex,
     speak,
     pause,
     resume,
     stop
   } = useSpeech();
 
-  // Auto-expand quand la lecture commence
+  const textContainerRef = useRef(null);
+  const highlightRef = useRef(null);
+
+  // Auto-expand and show text when speech starts
   useEffect(() => {
     if (isSpeaking) {
       setIsExpanded(true);
+      setShowText(true);
     }
   }, [isSpeaking]);
+
+  // Auto-scroll karaoke text to keep current word visible
+  useEffect(() => {
+    if (highlightRef.current && textContainerRef.current) {
+      const container = textContainerRef.current;
+      const highlight = highlightRef.current;
+      const highlightTop = highlight.offsetTop - container.offsetTop;
+      const scrollTarget = highlightTop - container.clientHeight / 2;
+      container.scrollTop = Math.max(0, scrollTarget);
+    }
+  }, [currentCharIndex]);
 
   async function loadAudioText(level) {
     setIsLoading(true);
@@ -243,12 +259,33 @@ export function AudioGuidePlayer({ artwork, className = '' }) {
           </p>
         </div>
 
-        {/* Zone texte */}
+        {/* Zone texte - Karaoke style */}
         {showText && audioText && (
           <div className="px-5 pb-5">
-            <div className="bg-black/30 rounded-xl p-4 max-h-32 overflow-y-auto border border-white/5">
-              <p className="text-sm text-white/70 leading-relaxed font-serif italic">
-                "{audioText}"
+            <div
+              ref={textContainerRef}
+              className="bg-black/30 rounded-xl p-4 max-h-40 overflow-y-auto border border-white/5 scroll-smooth"
+            >
+              <p className="text-sm leading-relaxed font-serif">
+                {(isSpeaking || isPaused) && currentCharIndex >= 0 ? (() => {
+                  const nextSpace = audioText.indexOf(' ', currentCharIndex + 1);
+                  const wordEnd = nextSpace === -1 ? audioText.length : nextSpace;
+                  return (
+                    <>
+                      <span className="text-accent font-medium not-italic">
+                        {audioText.slice(0, currentCharIndex)}
+                      </span>
+                      <span ref={highlightRef} className="text-white bg-accent/20 px-0.5 rounded not-italic">
+                        {audioText.slice(currentCharIndex, wordEnd)}
+                      </span>
+                      <span className="text-white/40 italic">
+                        {audioText.slice(wordEnd)}
+                      </span>
+                    </>
+                  );
+                })() : (
+                  <span className="text-white/70 italic">"{audioText}"</span>
+                )}
               </p>
             </div>
           </div>
