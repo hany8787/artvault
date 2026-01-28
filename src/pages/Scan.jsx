@@ -3,8 +3,12 @@ import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import MuseumAutocomplete from '../components/MuseumAutocomplete'
-import SuggestionInput from '../components/ui/SuggestionInput'
 import Loader from '../components/ui/Loader'
+import BatchScanMode from '../components/scan/BatchScanMode'
+import CropPreview from '../components/scan/CropPreview'
+import { detectArtworkBounds, applyCrop } from '../utils/autoCrop'
+import { extractText, parseCartelText, detectCartelRegion } from '../utils/ocrCartel'
+import { getDominantColor } from '../utils/colorExtractor'
 
 const ANALYSIS_STEPS = [
   'Analyse de l\'image...',
@@ -14,6 +18,11 @@ const ANALYSIS_STEPS = [
   'Rédaction du contexte historique...'
 ]
 
+const SCAN_MODES = {
+  SINGLE: 'single',
+  BATCH: 'batch'
+}
+
 export default function Scan() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -22,12 +31,24 @@ export default function Scan() {
   const canvasRef = useRef(null)
 
   // States
-  const [step, setStep] = useState('capture') // capture, analyzing, form, saving
+  const [step, setStep] = useState('capture') // capture, crop, analyzing, form, saving
+  const [scanMode, setScanMode] = useState(SCAN_MODES.SINGLE)
   const [imageData, setImageData] = useState(null)
+  const [originalImageData, setOriginalImageData] = useState(null)
   const [imageFile, setImageFile] = useState(null)
   const [cameraActive, setCameraActive] = useState(false)
   const [analysisStep, setAnalysisStep] = useState(0)
   const [error, setError] = useState('')
+
+  // Auto-crop states
+  const [cropBounds, setCropBounds] = useState(null)
+  const [autoCropEnabled, setAutoCropEnabled] = useState(true)
+  const [showCropPreview, setShowCropPreview] = useState(false)
+
+  // OCR states
+  const [ocrEnabled, setOcrEnabled] = useState(true)
+  const [ocrProgress, setOcrProgress] = useState(0)
+  const [ocrData, setOcrData] = useState(null)
 
   // Form data
   const [formData, setFormData] = useState({
@@ -44,7 +65,8 @@ export default function Scan() {
     museum_city: '',
     museum_country: '',
     description: '',
-    curatorial_note: ''
+    curatorial_note: '',
+    dominant_color: null
   })
 
   // Auto-start camera on mount
@@ -82,7 +104,7 @@ export default function Scan() {
     setCameraActive(false)
   }
 
-  function capturePhoto() {
+  async function capturePhoto() {
     if (!videoRef.current || !canvasRef.current) return
 
     const video = videoRef.current
@@ -94,6 +116,7 @@ export default function Scan() {
     ctx.drawImage(video, 0, 0)
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+    setOriginalImageData(dataUrl)
     setImageData(dataUrl)
 
     canvas.toBlob((blob) => {
@@ -102,24 +125,62 @@ export default function Scan() {
     }, 'image/jpeg', 0.9)
 
     stopCamera()
+
+    // Auto-detect crop bounds if enabled
+    if (autoCropEnabled) {
+      try {
+        const bounds = await detectArtworkBounds(canvas)
+        if (bounds.confidence > 0.5) {
+          setCropBounds(bounds)
+          setShowCropPreview(true)
+        }
+      } catch (err) {
+        console.log('Auto-crop detection failed:', err)
+      }
+    }
   }
 
-  function handleFileSelect(e) {
+  async function handleFileSelect(e) {
     const file = e.target.files?.[0]
     if (!file) return
 
     setImageFile(file)
     stopCamera()
+
     const reader = new FileReader()
-    reader.onload = (e) => {
-      setImageData(e.target.result)
+    reader.onload = async (e) => {
+      const dataUrl = e.target.result
+      setOriginalImageData(dataUrl)
+      setImageData(dataUrl)
+
+      // Auto-detect crop bounds if enabled
+      if (autoCropEnabled) {
+        try {
+          const img = new Image()
+          img.onload = async () => {
+            const bounds = await detectArtworkBounds(img)
+            if (bounds.confidence > 0.5) {
+              setCropBounds(bounds)
+              setShowCropPreview(true)
+            }
+          }
+          img.src = dataUrl
+        } catch (err) {
+          console.log('Auto-crop detection failed:', err)
+        }
+      }
     }
     reader.readAsDataURL(file)
   }
 
   function resetCapture() {
     setImageData(null)
+    setOriginalImageData(null)
     setImageFile(null)
+    setCropBounds(null)
+    setShowCropPreview(false)
+    setOcrData(null)
+    setOcrProgress(0)
     setStep('capture')
     setFormData({
       title: '',
@@ -135,13 +196,40 @@ export default function Scan() {
       museum_city: '',
       museum_country: '',
       description: '',
-      curatorial_note: ''
+      curatorial_note: '',
+      dominant_color: null
     })
     setError('')
     startCamera()
   }
 
-  // AI Analysis
+  // Handle crop confirmation
+  function handleCropConfirm(bounds) {
+    if (originalImageData && bounds) {
+      const img = new Image()
+      img.onload = () => {
+        const croppedDataUrl = applyCrop(img, bounds)
+        setImageData(croppedDataUrl)
+
+        // Create new file from cropped image
+        fetch(croppedDataUrl)
+          .then(res => res.blob())
+          .then(blob => {
+            const file = new File([blob], `cropped-${Date.now()}.jpg`, { type: 'image/jpeg' })
+            setImageFile(file)
+          })
+      }
+      img.src = originalImageData
+    }
+    setShowCropPreview(false)
+  }
+
+  function handleCropCancel() {
+    setCropBounds(null)
+    setShowCropPreview(false)
+  }
+
+  // AI Analysis with OCR and color extraction
   async function analyzeImage() {
     setStep('analyzing')
     setAnalysisStep(0)
@@ -152,39 +240,92 @@ export default function Scan() {
         setAnalysisStep(prev => (prev < ANALYSIS_STEPS.length - 1 ? prev + 1 : prev))
       }, 1000)
 
+      // Run AI analysis, OCR, and color extraction in parallel
       const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '')
 
-      const { data, error: fnError } = await supabase.functions.invoke('enrich-artwork', {
-        body: { imageBase64: base64Data }
-      })
+      const [aiResult, colorResult, ocrResult] = await Promise.all([
+        // AI enrichment
+        supabase.functions.invoke('enrich-artwork', {
+          body: { imageBase64: base64Data }
+        }),
+        // Color extraction
+        getDominantColor(imageData).catch(() => ({ hex: null })),
+        // OCR (if enabled)
+        ocrEnabled ? runOcrAnalysis() : Promise.resolve(null)
+      ])
 
       clearInterval(progressInterval)
       setAnalysisStep(ANALYSIS_STEPS.length - 1)
 
-      if (fnError) throw fnError
+      if (aiResult.error) throw aiResult.error
 
-      const result = data.data || data
+      const result = aiResult.data?.data || aiResult.data || {}
 
-      setFormData({
-        title: result.title || '',
-        artist: result.artist || '',
+      // Merge OCR data with AI result (OCR can fill gaps)
+      const mergedData = {
+        title: result.title || ocrResult?.title || '',
+        artist: result.artist || ocrResult?.artist || '',
         artist_dates: result.artist_dates || '',
-        year: result.year || '',
+        year: result.year || ocrResult?.year || '',
         period: result.period || '',
         style: result.style || '',
-        medium: result.medium || '',
-        dimensions: result.dimensions || '',
+        medium: result.medium || ocrResult?.medium || '',
+        dimensions: result.dimensions || ocrResult?.dimensions || '',
         museum: result.museum || '',
         museum_city: result.museum_city || '',
         museum_country: result.museum_country || '',
         description: result.description || '',
-        curatorial_note: result.curatorial_note || ''
-      })
+        curatorial_note: result.curatorial_note || '',
+        dominant_color: colorResult?.hex || null
+      }
+
+      setFormData(mergedData)
       setStep('form')
     } catch (err) {
       console.error('Analysis error:', err)
       setError('Erreur d\'analyse. Veuillez réessayer.')
       setStep('capture')
+    }
+  }
+
+  // Run OCR analysis on the image
+  async function runOcrAnalysis() {
+    try {
+      // First, detect if there's a cartel region
+      const img = new Image()
+      img.src = imageData
+
+      await new Promise((resolve) => {
+        if (img.complete) resolve()
+        else img.onload = resolve
+      })
+
+      const cartelDetection = await detectCartelRegion(img)
+
+      if (cartelDetection.detected && cartelDetection.region) {
+        // Extract text from cartel region
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        const region = cartelDetection.region
+
+        canvas.width = region.width
+        canvas.height = region.height
+        ctx.drawImage(img, region.x, region.y, region.width, region.height, 0, 0, region.width, region.height)
+
+        const cartelImage = canvas.toDataURL('image/jpeg', 0.95)
+        const ocrResult = await extractText(cartelImage, setOcrProgress)
+
+        if (ocrResult.confidence > 50) {
+          const parsed = parseCartelText(ocrResult.text)
+          setOcrData(parsed)
+          return parsed
+        }
+      }
+
+      return null
+    } catch (err) {
+      console.log('OCR failed:', err)
+      return null
     }
   }
 
@@ -204,9 +345,8 @@ export default function Scan() {
 
     try {
       let imageUrl = null
-      let museumId = formData.museum_id || null
+      let museumId = formData.museum_id
 
-      // Upload image if exists
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop()
         const fileName = `${user.id}/${Date.now()}.${fileExt}`
@@ -215,10 +355,7 @@ export default function Scan() {
           .from('artworks')
           .upload(fileName, imageFile)
 
-        if (uploadError) {
-          console.error('Upload error:', uploadError)
-          throw uploadError
-        }
+        if (uploadError) throw uploadError
 
         const { data: { publicUrl } } = supabase.storage
           .from('artworks')
@@ -227,53 +364,40 @@ export default function Scan() {
         imageUrl = publicUrl
       }
 
-      // Find or create museum if name provided but no ID
-      if (formData.museum && formData.museum.trim() && !museumId) {
-        try {
-          const { data: foundMuseumId, error: rpcError } = await supabase
-            .rpc('find_or_create_museum', {
-              p_name: formData.museum.trim(),
-              p_city: formData.museum_city?.trim() || null,
-              p_country: formData.museum_country?.trim() || null
-            })
+      if (formData.museum.trim() && !museumId) {
+        const { data: foundMuseumId } = await supabase
+          .rpc('find_or_create_museum', {
+            p_name: formData.museum.trim(),
+            p_city: formData.museum_city.trim() || null,
+            p_country: formData.museum_country.trim() || null
+          })
 
-          if (!rpcError && foundMuseumId) {
-            museumId = foundMuseumId
-          }
-        } catch (rpcErr) {
-          console.warn('Museum RPC failed, continuing without museum_id:', rpcErr)
+        if (foundMuseumId) {
+          museumId = foundMuseumId
         }
       }
 
-      // Parse year as integer
-      const yearValue = formData.year?.trim() || ''
-      const parsedYear = yearValue ? parseInt(yearValue, 10) : null
-      const validYear = parsedYear && !isNaN(parsedYear) ? parsedYear : null
-
-      const artworkData = {
-        user_id: user.id,
-        image_url: imageUrl,
-        title: formData.title.trim(),
-        artist: formData.artist?.trim() || null,
-        artist_dates: formData.artist_dates?.trim() || null,
-        year: validYear,
-        period: formData.period?.trim() || null,
-        style: formData.style?.trim() || null,
-        medium: formData.medium?.trim() || null,
-        dimensions: formData.dimensions?.trim() || null,
-        museum: formData.museum?.trim() || null,
-        museum_id: museumId,
-        museum_city: formData.museum_city?.trim() || null,
-        museum_country: formData.museum_country?.trim() || null,
-        description: formData.description?.trim() || null,
-        curatorial_note: formData.curatorial_note?.trim() || null
-      }
-
-      console.log('Saving artwork:', artworkData)
-
       const { data, error: insertError } = await supabase
         .from('artworks')
-        .insert(artworkData)
+        .insert({
+          user_id: user.id,
+          image_url: imageUrl,
+          title: formData.title.trim(),
+          artist: formData.artist.trim() || null,
+          artist_dates: formData.artist_dates.trim() || null,
+          year: formData.year.trim() || null,
+          period: formData.period.trim() || null,
+          style: formData.style.trim() || null,
+          medium: formData.medium.trim() || null,
+          dimensions: formData.dimensions.trim() || null,
+          museum: formData.museum.trim() || null,
+          museum_id: museumId,
+          museum_city: formData.museum_city.trim() || null,
+          museum_country: formData.museum_country.trim() || null,
+          description: formData.description.trim() || null,
+          curatorial_note: formData.curatorial_note.trim() || null,
+          dominant_color: formData.dominant_color || null
+        })
         .select()
         .single()
 
@@ -299,6 +423,24 @@ export default function Scan() {
       museum_city: museum.city || prev.museum_city,
       museum_country: museum.country || prev.museum_country
     }))
+  }
+
+  // Show crop preview if auto-crop detected
+  if (showCropPreview && originalImageData && cropBounds) {
+    return (
+      <CropPreview
+        imageUrl={originalImageData}
+        initialBounds={cropBounds}
+        onCropChange={setCropBounds}
+        onConfirm={handleCropConfirm}
+        onCancel={handleCropCancel}
+      />
+    )
+  }
+
+  // Show batch mode if selected
+  if (scanMode === SCAN_MODES.BATCH) {
+    return <BatchScanMode onExit={() => setScanMode(SCAN_MODES.SINGLE)} />
   }
 
   // CAPTURE VIEW
@@ -355,7 +497,14 @@ export default function Scan() {
               </p>
             </div>
 
-            <div className="w-10" /> {/* Spacer */}
+            {/* Batch mode toggle */}
+            <button
+              onClick={() => setScanMode(SCAN_MODES.BATCH)}
+              className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white"
+              title="Mode visite (batch)"
+            >
+              <span className="material-symbols-outlined">burst_mode</span>
+            </button>
           </div>
 
           {/* Viewfinder */}
@@ -376,15 +525,35 @@ export default function Scan() {
             </div>
           )}
 
-          {/* Retake button */}
+          {/* Action buttons when image captured */}
           {imageData && (
-            <button
-              onClick={resetCapture}
-              className="absolute top-20 right-4 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm text-white text-sm flex items-center gap-2"
-            >
-              <span className="material-symbols-outlined text-lg">refresh</span>
-              Reprendre
-            </button>
+            <div className="absolute top-20 right-4 flex flex-col gap-2">
+              <button
+                onClick={resetCapture}
+                className="px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm text-white text-sm flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-lg">refresh</span>
+                Reprendre
+              </button>
+              {originalImageData && (
+                <button
+                  onClick={() => {
+                    // Re-detect bounds for manual adjustment
+                    const img = new Image()
+                    img.onload = async () => {
+                      const bounds = await detectArtworkBounds(img)
+                      setCropBounds(bounds)
+                      setShowCropPreview(true)
+                    }
+                    img.src = originalImageData
+                  }}
+                  className="px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm text-white text-sm flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-lg">crop</span>
+                  Recadrer
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -399,6 +568,29 @@ export default function Scan() {
                 <span className="material-symbols-outlined">auto_awesome</span>
                 Analyser avec l'IA
               </button>
+
+              {/* Options row */}
+              <div className="flex items-center justify-center gap-4 text-white/60 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={ocrEnabled}
+                    onChange={(e) => setOcrEnabled(e.target.checked)}
+                    className="w-4 h-4 rounded accent-accent"
+                  />
+                  OCR Cartel
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoCropEnabled}
+                    onChange={(e) => setAutoCropEnabled(e.target.checked)}
+                    className="w-4 h-4 rounded accent-accent"
+                  />
+                  Auto-crop
+                </label>
+              </div>
+
               <button
                 onClick={skipToForm}
                 className="w-full bg-white/10 backdrop-blur-sm text-white py-3 rounded-full flex items-center justify-center gap-2 hover:bg-white/20 transition-colors"
@@ -497,7 +689,7 @@ export default function Scan() {
 
   // FORM VIEW
   return (
-    <div className="min-h-screen pb-32">
+    <div className="min-h-screen pb-24">
       {/* Header */}
       <header className="sticky top-0 z-40 glass border-b border-default">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -587,20 +779,26 @@ export default function Scan() {
                     placeholder="1889"
                   />
                 </div>
-                <SuggestionInput
-                  label="Période"
-                  type="period"
-                  value={formData.period}
-                  onChange={(value) => updateField('period', value)}
-                  placeholder="Post-impressionnisme"
-                />
-                <SuggestionInput
-                  label="Style"
-                  type="style"
-                  value={formData.style}
-                  onChange={(value) => updateField('style', value)}
-                  placeholder="Paysage"
-                />
+                <div>
+                  <label className="label text-secondary mb-2 block">Période</label>
+                  <input
+                    type="text"
+                    value={formData.period}
+                    onChange={(e) => updateField('period', e.target.value)}
+                    className="input"
+                    placeholder="Post-impressionnisme"
+                  />
+                </div>
+                <div>
+                  <label className="label text-secondary mb-2 block">Style</label>
+                  <input
+                    type="text"
+                    value={formData.style}
+                    onChange={(e) => updateField('style', e.target.value)}
+                    className="input"
+                    placeholder="Expressionnisme"
+                  />
+                </div>
               </div>
             </div>
           </section>
