@@ -30,6 +30,8 @@ export default function ArtworkDetail() {
   const [relatedArtworks, setRelatedArtworks] = useState([])
   const [togglingFavorite, setTogglingFavorite] = useState(false)
   const [showCollectionModal, setShowCollectionModal] = useState(false)
+  const [generatingAI, setGeneratingAI] = useState(false)
+  const [aiProgress, setAiProgress] = useState('')
 
   useEffect(() => {
     fetchArtwork()
@@ -175,6 +177,103 @@ export default function ArtworkDetail() {
       console.error('Share error:', err)
     }
     setShowMenu(false)
+  }
+
+  // Check if artwork needs AI description (imported without real description)
+  const needsAIDescription = artwork && (
+    !artwork.description ||
+    artwork.description.startsWith('Importé depuis') ||
+    artwork.description.trim().length < 20
+  )
+
+  async function generateAIDescription() {
+    if (generatingAI) return
+    setGeneratingAI(true)
+    setAiProgress('Préparation...')
+
+    try {
+      // Try to convert image to base64 for vision analysis
+      let imageBase64 = null
+      if (artwork.image_url) {
+        setAiProgress('Chargement de l\'image...')
+        try {
+          const img = new Image()
+          img.crossOrigin = 'anonymous'
+          await new Promise((resolve, reject) => {
+            img.onload = resolve
+            img.onerror = reject
+            img.src = artwork.image_url
+          })
+          const canvas = document.createElement('canvas')
+          canvas.width = Math.min(img.naturalWidth, 1200)
+          canvas.height = Math.round(canvas.width * (img.naturalHeight / img.naturalWidth))
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+          imageBase64 = canvas.toDataURL('image/jpeg', 0.8).replace(/^data:image\/\w+;base64,/, '')
+        } catch (imgErr) {
+          console.log('Image conversion failed, using metadata only:', imgErr)
+        }
+      }
+
+      setAiProgress('Analyse IA en cours...')
+
+      // Call enrich-artwork edge function
+      const body = {}
+      if (imageBase64) {
+        body.imageBase64 = imageBase64
+      }
+      // Always send metadata for context
+      if (artwork.title) body.title = artwork.title
+      if (artwork.artist) body.artist = artwork.artist
+
+      const { data, error: fnError } = await supabase.functions.invoke('enrich-artwork', { body })
+
+      if (fnError) throw fnError
+
+      const aiData = data?.data || data
+      if (!aiData) throw new Error('Pas de réponse IA')
+
+      setAiProgress('Mise à jour...')
+
+      // Build update object - only update fields that are empty or AI-generated
+      const updateData = {}
+      if (aiData.description) updateData.description = aiData.description
+      if (aiData.curatorial_note && !artwork.curatorial_note) updateData.curatorial_note = aiData.curatorial_note
+      if (aiData.period && !artwork.period) updateData.period = aiData.period
+      if (aiData.style && !artwork.style) updateData.style = aiData.style
+      if (aiData.artist_dates && !artwork.artist_dates) updateData.artist_dates = aiData.artist_dates
+      if (aiData.museum_city && !artwork.museum_city) updateData.museum_city = aiData.museum_city
+      if (aiData.museum_country && !artwork.museum_country) updateData.museum_country = aiData.museum_country
+      if (aiData.medium && !artwork.medium) updateData.medium = aiData.medium
+      if (aiData.dimensions && !artwork.dimensions) updateData.dimensions = aiData.dimensions
+
+      if (Object.keys(updateData).length === 0) {
+        setAiProgress('')
+        setGeneratingAI(false)
+        return
+      }
+
+      updateData.is_enriched = true
+
+      const { data: updated, error: updateError } = await supabase
+        .from('artworks')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (updateError) throw updateError
+
+      setArtwork(updated)
+      setEditForm(updated)
+      setAiProgress('')
+    } catch (err) {
+      console.error('AI generation error:', err)
+      setAiProgress('Erreur: ' + (err.message || 'Échec de l\'analyse'))
+      setTimeout(() => setAiProgress(''), 3000)
+    } finally {
+      setGeneratingAI(false)
+    }
   }
 
   if (loading) {
@@ -533,8 +632,48 @@ export default function ArtworkDetail() {
               </blockquote>
             )}
 
-            {/* If no description, show a placeholder */}
-            {!artwork.description && !artwork.curatorial_note && (
+            {/* AI Generate button - shown when description is missing or just "Importé depuis" */}
+            {needsAIDescription && (
+              <div className="text-center py-10 bg-gradient-to-br from-accent/5 to-transparent border border-accent/20 rounded-2xl">
+                <span className="material-symbols-outlined text-5xl text-accent/60 mb-3">auto_awesome</span>
+                <p className="text-primary font-medium mb-1">
+                  {!artwork.description || artwork.description.trim().length < 20
+                    ? 'Aucune description disponible'
+                    : 'Description basique'}
+                </p>
+                <p className="text-secondary text-sm mb-5 max-w-sm mx-auto">
+                  L'IA peut analyser cette œuvre et générer une description détaillée, le contexte historique et enrichir les métadonnées.
+                </p>
+                <button
+                  onClick={generateAIDescription}
+                  disabled={generatingAI}
+                  className="btn btn-primary gap-2"
+                >
+                  {generatingAI ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      {aiProgress || 'Analyse...'}
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined">auto_awesome</span>
+                      Générer avec l'IA
+                    </>
+                  )}
+                </button>
+                {!generatingAI && (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="btn btn-ghost mt-2 text-sm"
+                  >
+                    ou écrire manuellement
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* If no description at all and AI not needed */}
+            {!needsAIDescription && !artwork.description && !artwork.curatorial_note && (
               <div className="text-center py-12 bg-secondary rounded-xl">
                 <span className="material-symbols-outlined text-4xl text-secondary mb-2">description</span>
                 <p className="text-secondary">Aucune description disponible</p>
