@@ -6,27 +6,10 @@ import { ArtworkCard } from '../components/ui/Card'
 import { FavoriteButton } from '../components/ui/FavoriteButton'
 import { SkeletonCard } from '../components/ui/Loader'
 import EmptyState from '../components/ui/EmptyState'
-import { Drawer } from '../components/ui/Modal'
-import { ChipGroup } from '../components/ui/Chip'
+import HierarchicalFilters, { ActiveFilterChips } from '../components/filters/HierarchicalFilters'
+import { ALL_FILTER_CATEGORIES, matchesFilter } from '../data/filterCategories'
 
-// Filter options
-const PERIODS = [
-  { value: 'renaissance', label: 'Renaissance' },
-  { value: 'baroque', label: 'Baroque' },
-  { value: 'romanticism', label: 'Romantisme' },
-  { value: 'impressionism', label: 'Impressionnisme' },
-  { value: 'modern', label: 'Art Moderne' },
-  { value: 'contemporary', label: 'Contemporain' },
-]
-
-const TYPES = [
-  { value: 'painting', label: 'Peinture' },
-  { value: 'sculpture', label: 'Sculpture' },
-  { value: 'photography', label: 'Photographie' },
-  { value: 'drawing', label: 'Dessin' },
-  { value: 'print', label: 'Gravure' },
-]
-
+// Options de tri
 const SORT_OPTIONS = [
   { value: 'recent', label: 'Date d\'ajout (récent)' },
   { value: 'oldest', label: 'Date d\'ajout (ancien)' },
@@ -34,6 +17,18 @@ const SORT_OPTIONS = [
   { value: 'artist', label: 'Artiste A-Z' },
   { value: 'year', label: 'Année' },
 ]
+
+// État initial des filtres
+function getInitialFilters() {
+  const filters = {}
+  ALL_FILTER_CATEGORIES.forEach(cat => {
+    filters[cat.id] = []
+  })
+  filters.museum = ''
+  filters.artist = ''
+  filters.favoritesOnly = false
+  return filters
+}
 
 export default function Collection() {
   const { user } = useAuth()
@@ -47,12 +42,8 @@ export default function Collection() {
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedPeriods, setSelectedPeriods] = useState([])
-  const [selectedTypes, setSelectedTypes] = useState([])
-  const [selectedMuseum, setSelectedMuseum] = useState('')
-  const [selectedArtist, setSelectedArtist] = useState('')
+  const [selectedFilters, setSelectedFilters] = useState(getInitialFilters())
   const [sortBy, setSortBy] = useState('recent')
-  const [favoritesOnly, setFavoritesOnly] = useState(false)
 
   useEffect(() => {
     fetchArtworks()
@@ -93,44 +84,35 @@ export default function Collection() {
         const matchesSearch =
           artwork.title?.toLowerCase().includes(query) ||
           artwork.artist?.toLowerCase().includes(query) ||
-          artwork.museum?.toLowerCase().includes(query)
+          artwork.museum?.toLowerCase().includes(query) ||
+          artwork.period?.toLowerCase().includes(query) ||
+          artwork.style?.toLowerCase().includes(query)
         if (!matchesSearch) return false
       }
 
-      // Period filter
-      if (selectedPeriods.length > 0) {
-        const period = artwork.period?.toLowerCase() || ''
-        const matchesPeriod = selectedPeriods.some(p => period.includes(p))
-        if (!matchesPeriod) return false
-      }
-
-      // Type filter (by medium)
-      if (selectedTypes.length > 0) {
-        const medium = artwork.medium?.toLowerCase() || ''
-        const matchesType = selectedTypes.some(t => {
-          if (t === 'painting') return medium.includes('oil') || medium.includes('huile') || medium.includes('canvas') || medium.includes('toile')
-          if (t === 'sculpture') return medium.includes('sculpt') || medium.includes('bronze') || medium.includes('marble')
-          if (t === 'photography') return medium.includes('photo') || medium.includes('print')
-          if (t === 'drawing') return medium.includes('draw') || medium.includes('dessin') || medium.includes('pencil')
-          if (t === 'print') return medium.includes('gravure') || medium.includes('litho') || medium.includes('etching')
-          return false
-        })
-        if (!matchesType) return false
+      // Favorites filter
+      if (selectedFilters.favoritesOnly && !artwork.is_favorite) {
+        return false
       }
 
       // Museum filter
-      if (selectedMuseum && artwork.museum !== selectedMuseum) {
+      if (selectedFilters.museum && artwork.museum !== selectedFilters.museum) {
         return false
       }
 
       // Artist filter
-      if (selectedArtist && artwork.artist !== selectedArtist) {
+      if (selectedFilters.artist && artwork.artist !== selectedFilters.artist) {
         return false
       }
 
-      // Favorites filter
-      if (favoritesOnly && !artwork.is_favorite) {
-        return false
+      // Hierarchical category filters
+      for (const category of ALL_FILTER_CATEGORIES) {
+        const selectedValues = selectedFilters[category.id] || []
+        if (selectedValues.length > 0) {
+          if (!matchesFilter(artwork, category.id, selectedValues)) {
+            return false
+          }
+        }
       }
 
       return true
@@ -155,20 +137,39 @@ export default function Collection() {
     }
 
     return result
-  }, [artworks, searchQuery, selectedPeriods, selectedTypes, selectedMuseum, selectedArtist, sortBy, favoritesOnly])
+  }, [artworks, searchQuery, selectedFilters, sortBy])
 
   // Count active filters
-  const activeFilterCount = selectedPeriods.length + selectedTypes.length +
-    (selectedMuseum ? 1 : 0) + (selectedArtist ? 1 : 0) + (favoritesOnly ? 1 : 0)
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    Object.entries(selectedFilters).forEach(([key, value]) => {
+      if (key === 'favoritesOnly' && value) count++
+      else if (key === 'museum' && value) count++
+      else if (key === 'artist' && value) count++
+      else if (Array.isArray(value)) count += value.length
+    })
+    return count
+  }, [selectedFilters])
 
   // Reset filters
   function resetFilters() {
-    setSelectedPeriods([])
-    setSelectedTypes([])
-    setSelectedMuseum('')
-    setSelectedArtist('')
-    setFavoritesOnly(false)
-    setSortBy('recent')
+    setSelectedFilters(getInitialFilters())
+  }
+
+  // Remove a single filter
+  function removeFilter(categoryId, value) {
+    if (categoryId === 'favoritesOnly') {
+      setSelectedFilters(prev => ({ ...prev, favoritesOnly: false }))
+    } else if (categoryId === 'museum') {
+      setSelectedFilters(prev => ({ ...prev, museum: '' }))
+    } else if (categoryId === 'artist') {
+      setSelectedFilters(prev => ({ ...prev, artist: '' }))
+    } else {
+      setSelectedFilters(prev => ({
+        ...prev,
+        [categoryId]: (prev[categoryId] || []).filter(v => v !== value)
+      }))
+    }
   }
 
   return (
@@ -189,11 +190,14 @@ export default function Collection() {
           <div className="flex items-center gap-2">
             {/* Favorites quick filter */}
             <button
-              onClick={() => setFavoritesOnly(!favoritesOnly)}
-              className={`btn btn-ghost btn-icon ${favoritesOnly ? 'text-red-500' : ''}`}
+              onClick={() => setSelectedFilters(prev => ({
+                ...prev,
+                favoritesOnly: !prev.favoritesOnly
+              }))}
+              className={`btn btn-ghost btn-icon ${selectedFilters.favoritesOnly ? 'text-red-500' : ''}`}
               title="Favoris uniquement"
             >
-              <span className={`material-symbols-outlined ${favoritesOnly ? 'filled' : ''}`}>
+              <span className={`material-symbols-outlined ${selectedFilters.favoritesOnly ? 'filled' : ''}`}>
                 favorite
               </span>
             </button>
@@ -241,7 +245,7 @@ export default function Collection() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher par titre, artiste ou musée..."
+              placeholder="Rechercher par titre, artiste, musée, période..."
               className="input pl-12"
               autoFocus
             />
@@ -255,7 +259,37 @@ export default function Collection() {
             )}
           </div>
         )}
+
+        {/* Sort dropdown (desktop) */}
+        <div className="hidden md:flex items-center justify-between mt-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-white/60">Trier par :</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-transparent border border-white/20 rounded-lg px-3 py-1.5 text-sm
+                       focus:border-accent focus:outline-none"
+            >
+              {SORT_OPTIONS.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <p className="text-sm text-white/60">
+            {filteredArtworks.length} résultat{filteredArtworks.length > 1 ? 's' : ''}
+          </p>
+        </div>
       </header>
+
+      {/* Active Filter Chips */}
+      <ActiveFilterChips
+        selectedFilters={selectedFilters}
+        onRemove={removeFilter}
+        onClearAll={resetFilters}
+      />
 
       {/* Content */}
       <div className="px-4 max-w-7xl mx-auto">
@@ -355,130 +389,16 @@ export default function Collection() {
         <span className="material-symbols-outlined text-2xl">add</span>
       </Link>
 
-      {/* Filters Drawer */}
-      <Drawer
+      {/* Hierarchical Filters Modal */}
+      <HierarchicalFilters
         isOpen={showFilters}
         onClose={() => setShowFilters(false)}
-        title="Filtres"
-      >
-        <div className="space-y-6">
-          {/* Results count */}
-          <p className="text-secondary">
-            {filteredArtworks.length} résultat{filteredArtworks.length > 1 ? 's' : ''}
-          </p>
-
-          {/* Favorites toggle */}
-          <div className="flex items-center justify-between">
-            <span className="font-medium">Favoris uniquement</span>
-            <button
-              onClick={() => setFavoritesOnly(!favoritesOnly)}
-              className={`w-12 h-7 rounded-full transition-colors ${
-                favoritesOnly ? 'bg-accent' : 'bg-secondary'
-              }`}
-            >
-              <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                favoritesOnly ? 'translate-x-6' : 'translate-x-1'
-              }`} />
-            </button>
-          </div>
-
-          <div className="divider" />
-
-          {/* Period filter */}
-          <div>
-            <h3 className="label mb-3">Période</h3>
-            <ChipGroup
-              options={PERIODS}
-              selected={selectedPeriods}
-              onChange={setSelectedPeriods}
-              multiple
-            />
-          </div>
-
-          <div className="divider" />
-
-          {/* Type filter */}
-          <div>
-            <h3 className="label mb-3">Type</h3>
-            <ChipGroup
-              options={TYPES}
-              selected={selectedTypes}
-              onChange={setSelectedTypes}
-              multiple
-            />
-          </div>
-
-          <div className="divider" />
-
-          {/* Museum filter */}
-          {museums.length > 0 && (
-            <div>
-              <h3 className="label mb-3">Musée</h3>
-              <select
-                value={selectedMuseum}
-                onChange={(e) => setSelectedMuseum(e.target.value)}
-                className="input"
-              >
-                <option value="">Tous les musées</option>
-                {museums.map(museum => (
-                  <option key={museum} value={museum}>{museum}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Artist filter */}
-          {artists.length > 0 && (
-            <div>
-              <h3 className="label mb-3">Artiste</h3>
-              <select
-                value={selectedArtist}
-                onChange={(e) => setSelectedArtist(e.target.value)}
-                className="input"
-              >
-                <option value="">Tous les artistes</option>
-                {artists.map(artist => (
-                  <option key={artist} value={artist}>{artist}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div className="divider" />
-
-          {/* Sort */}
-          <div>
-            <h3 className="label mb-3">Trier par</h3>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="input"
-            >
-              {SORT_OPTIONS.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-3 pt-4">
-            <button
-              onClick={resetFilters}
-              className="btn btn-outline flex-1"
-            >
-              Réinitialiser
-            </button>
-            <button
-              onClick={() => setShowFilters(false)}
-              className="btn btn-primary flex-1"
-            >
-              Appliquer
-            </button>
-          </div>
-        </div>
-      </Drawer>
+        selectedFilters={selectedFilters}
+        onFiltersChange={setSelectedFilters}
+        resultCount={filteredArtworks.length}
+        museums={museums}
+        artists={artists}
+      />
     </div>
   )
 }
