@@ -1,17 +1,12 @@
 /**
- * Art Import Component
- * Search and import real artworks from museum APIs:
- * - Art Institute of Chicago (primary) - free, no key needed
- * - Curated suggestions as fallback
+ * Museum Import Component
+ * Search and import artworks from 6+ museum open-access APIs
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-
-// Art Institute of Chicago API
-const AIC_BASE = 'https://api.artic.edu/api/v1'
-const AIC_IMAGE = 'https://www.artic.edu/iiif/2'
+import { searchMuseums, loadAICCurated, MUSEUM_SOURCES } from '../../services/museumApis'
 
 function parseYear(yearValue) {
   if (!yearValue) return null
@@ -27,40 +22,24 @@ function parseYear(yearValue) {
   return null
 }
 
-function aicImageUrl(imageId, size = 843) {
-  if (!imageId) return null
-  return `${AIC_IMAGE}/${imageId}/full/${size},/0/default.jpg`
+// Source display colors
+const SOURCE_COLORS = {
+  aic: 'bg-red-500/80',
+  met: 'bg-blue-500/80',
+  rijksmuseum: 'bg-orange-500/80',
+  cleveland: 'bg-emerald-500/80',
+  harvard: 'bg-purple-500/80',
+  va: 'bg-pink-500/80'
 }
 
-function mapAicArtwork(item) {
-  return {
-    id: `aic-${item.id}`,
-    title: item.title || 'Sans titre',
-    artist: item.artist_title || 'Artiste inconnu',
-    year: item.date_display || (item.date_start ? String(item.date_start) : ''),
-    museum: 'Art Institute of Chicago',
-    medium: item.medium_display || '',
-    dimensions: item.dimensions || '',
-    image_url: aicImageUrl(item.image_id),
-    image_id: item.image_id
-  }
+const SOURCE_LABELS = {
+  aic: 'AIC',
+  met: 'Met',
+  rijksmuseum: 'Rijks',
+  cleveland: 'CMA',
+  harvard: 'Harvard',
+  va: 'V&A'
 }
-
-// Curated artwork IDs from AIC for initial display
-const CURATED_IDS = [
-  27992,  // A Sunday on La Grande Jatte — Seurat
-  28560,  // The Bedroom — Van Gogh
-  111628, // Nighthawks — Hopper
-  6565,   // American Gothic — Wood
-  87479,  // The Old Guitarist — Picasso
-  80607,  // Sky Above Clouds IV — O'Keeffe
-  16568,  // The Assumption of the Virgin — El Greco
-  16487,  // Stacks of Wheat — Monet
-  14598,  // Bathers by a River — Matisse
-  20684,  // The Herring Net — Homer
-  76244,  // Judith Slaying Holofernes — Gentileschi
-  24306,  // Two Sisters (On the Terrace) — Renoir
-]
 
 export default function GoogleArtsImport({ onClose, onImportComplete }) {
   const { user } = useAuth()
@@ -68,6 +47,7 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
   const [searchResults, setSearchResults] = useState([])
   const [curatedArtworks, setCuratedArtworks] = useState([])
   const [selectedArtworks, setSelectedArtworks] = useState([])
+  const [selectedSource, setSelectedSource] = useState('all')
   const [searching, setSearching] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importProgress, setImportProgress] = useState(0)
@@ -79,19 +59,12 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
 
   // Load curated artworks on mount
   useEffect(() => {
-    loadCuratedArtworks()
+    loadCurated()
   }, [])
 
-  async function loadCuratedArtworks() {
+  async function loadCurated() {
     try {
-      const res = await fetch(
-        `${AIC_BASE}/artworks?ids=${CURATED_IDS.join(',')}&fields=id,title,artist_title,date_start,date_display,medium_display,dimensions,image_id`
-      )
-      if (!res.ok) throw new Error('API error')
-      const json = await res.json()
-      const artworks = (json.data || [])
-        .map(mapAicArtwork)
-        .filter(a => a.image_id)
+      const artworks = await loadAICCurated()
       setCuratedArtworks(artworks)
     } catch (err) {
       console.error('Failed to load curated artworks:', err)
@@ -113,27 +86,27 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
     }
 
     setSearching(true)
+    setError('')
     searchTimeoutRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `${AIC_BASE}/artworks/search?q=${encodeURIComponent(query)}&fields=id,title,artist_title,date_start,date_display,medium_display,dimensions,image_id&limit=24`
-        )
-        if (!res.ok) throw new Error('Search failed')
-        const json = await res.json()
-        const artworks = (json.data || [])
-          .map(mapAicArtwork)
-          .filter(a => a.image_id)
-        setSearchResults(artworks)
+        const results = await searchMuseums(query, selectedSource, 30)
+        setSearchResults(results)
       } catch (err) {
         console.error('Search error:', err)
         setError('Erreur de recherche. Vérifiez votre connexion.')
       } finally {
         setSearching(false)
       }
-    }, 400)
-  }, [])
+    }, 500)
+  }, [selectedSource])
 
-  // Which artworks to display
+  // Re-search when source changes
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      handleSearch(searchQuery)
+    }
+  }, [selectedSource])
+
   const displayedArtworks = searchQuery.trim() ? searchResults : curatedArtworks
 
   function toggleSelection(artwork) {
@@ -176,6 +149,8 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
           continue
         }
 
+        const sourceName = MUSEUM_SOURCES.find(s => s.id === artwork.source)?.name || artwork.museum
+
         const { error: insertError } = await supabase
           .from('artworks')
           .insert({
@@ -183,11 +158,13 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
             title: artwork.title,
             artist: artwork.artist,
             year: parseYear(artwork.year),
-            museum: artwork.museum,
+            museum: artwork.museum || sourceName,
+            museum_city: artwork.museum_city || null,
+            museum_country: artwork.museum_country || null,
             medium: artwork.medium || null,
             dimensions: artwork.dimensions || null,
             image_url: artwork.image_url,
-            description: `Importé depuis Art Institute of Chicago`
+            description: `Importé depuis ${sourceName}`
           })
 
         if (insertError) {
@@ -218,15 +195,21 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
     }
   }
 
+  // Count results by source
+  const sourceCounts = {}
+  for (const a of searchResults) {
+    sourceCounts[a.source] = (sourceCounts[a.source] || 0) + 1
+  }
+
   return (
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-      <div className="bg-bg-light dark:bg-bg-dark rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+      <div className="bg-bg-light dark:bg-bg-dark rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="p-5 border-b border-primary/10 flex items-center justify-between">
           <div>
             <h2 className="font-display text-2xl italic text-accent">Explorer des œuvres</h2>
             <p className="text-secondary text-sm mt-1">
-              Recherchez parmi des milliers d'œuvres de musées
+              6 musées · Des milliers d'œuvres en accès libre
             </p>
           </div>
           <button onClick={onClose} className="btn btn-ghost btn-icon">
@@ -235,7 +218,7 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
         </div>
 
         {/* Search */}
-        <div className="p-4 border-b border-primary/10">
+        <div className="p-4 border-b border-primary/10 space-y-3">
           <div className="relative">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary">
               search
@@ -253,12 +236,36 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
               </div>
             )}
           </div>
-          {!searchQuery.trim() && (
-            <p className="text-xs text-secondary mt-2">
-              <span className="material-symbols-outlined text-xs align-middle mr-1">museum</span>
-              Art Institute of Chicago — {curatedArtworks.length} œuvres suggérées
-            </p>
-          )}
+
+          {/* Source selector */}
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {MUSEUM_SOURCES.map(source => {
+              const isActive = selectedSource === source.id
+              const count = source.id === 'all'
+                ? searchResults.length
+                : (sourceCounts[source.id] || 0)
+              const hasResults = searchQuery.trim() && count > 0
+
+              return (
+                <button
+                  key={source.id}
+                  onClick={() => setSelectedSource(source.id)}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    isActive
+                      ? 'bg-accent text-black'
+                      : 'bg-white/5 text-secondary hover:bg-white/10'
+                  }`}
+                >
+                  {source.id === 'all' ? 'Tous' : source.name}
+                  {hasResults && (
+                    <span className={`ml-1.5 ${isActive ? 'text-black/60' : 'text-accent'}`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         {/* Artworks grid */}
@@ -272,6 +279,9 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
               <p className="text-secondary text-sm mt-1">
                 {importedCount} œuvre{importedCount > 1 ? 's' : ''} ajoutée{importedCount > 1 ? 's' : ''}
               </p>
+              <p className="text-accent/60 text-xs mt-3">
+                Astuce : ouvrez une œuvre importée et cliquez "Générer avec l'IA" pour obtenir une description complète
+              </p>
             </div>
           ) : loadingCurated && !searchQuery.trim() ? (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -283,19 +293,32 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
             <div className="text-center py-12">
               <span className="material-symbols-outlined text-4xl text-white/20 mb-2">image_search</span>
               <p className="text-secondary text-sm">
-                {searchQuery.trim()
-                  ? 'Aucun résultat. Essayez un autre terme.'
-                  : 'Recherchez une œuvre pour commencer'}
+                {searching
+                  ? 'Recherche en cours...'
+                  : searchQuery.trim()
+                    ? 'Aucun résultat. Essayez un autre terme ou changez de musée.'
+                    : 'Recherchez une œuvre pour commencer'}
               </p>
             </div>
           ) : (
             <>
               {searchQuery.trim() && searchResults.length > 0 && (
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-secondary text-xs">{searchResults.length} résultat{searchResults.length > 1 ? 's' : ''}</p>
+                  <p className="text-secondary text-xs">
+                    {searchResults.length} résultat{searchResults.length > 1 ? 's' : ''}
+                    {selectedSource !== 'all' && ` depuis ${MUSEUM_SOURCES.find(s => s.id === selectedSource)?.name}`}
+                  </p>
                   <button onClick={selectAll} className="text-accent text-xs hover:underline">
                     Tout sélectionner
                   </button>
+                </div>
+              )}
+              {!searchQuery.trim() && (
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-secondary text-xs">
+                    <span className="material-symbols-outlined text-xs align-middle mr-1">museum</span>
+                    Art Institute of Chicago — Suggestions
+                  </p>
                 </div>
               )}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -322,6 +345,13 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
                           }}
                         />
                       </div>
+
+                      {/* Source badge */}
+                      {artwork.source && (
+                        <div className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[10px] font-bold text-white ${SOURCE_COLORS[artwork.source] || 'bg-white/30'}`}>
+                          {SOURCE_LABELS[artwork.source] || artwork.source}
+                        </div>
+                      )}
 
                       {isSelected && (
                         <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-accent flex items-center justify-center">
