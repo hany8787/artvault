@@ -8,6 +8,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { getDominantColor } from '../../utils/colorExtractor'
+import { extractText } from '../../utils/ocrCartel'
 import Loader from '../ui/Loader'
 
 const BATCH_STATUS = {
@@ -64,15 +65,19 @@ export default function BatchScanMode({ onExit }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // Cartel workflow
+  const [cartelPrompt, setCartelPrompt] = useState(null) // ID of capture awaiting cartel decision
+  const [capturingCartel, setCapturingCartel] = useState(false) // true when in cartel capture mode
+
   // Start camera on mount
   useEffect(() => {
     startCamera()
     return () => stopCamera()
   }, [])
 
-  // Process queue in background
+  // Process queue in background (only items not waiting for cartel)
   useEffect(() => {
-    const pendingItem = captures.find(c => c.status === BATCH_STATUS.PENDING)
+    const pendingItem = captures.find(c => c.status === BATCH_STATUS.PENDING && !c.waitingCartel)
     if (pendingItem && !captures.some(c => c.status === BATCH_STATUS.ANALYZING)) {
       processCapture(pendingItem.id)
     }
@@ -117,20 +122,63 @@ export default function BatchScanMode({ onExit }) {
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
 
+    if (capturingCartel && cartelPrompt) {
+      // We're capturing a cartel photo for an existing capture
+      canvas.toBlob((blob) => {
+        const cartelFile = new File([blob], `cartel-${Date.now()}.jpg`, { type: 'image/jpeg' })
+        setCaptures(prev => prev.map(c =>
+          c.id === cartelPrompt ? { ...c, cartelImageData: dataUrl, cartelFile } : c
+        ))
+        setCapturingCartel(false)
+        setCartelPrompt(null)
+      }, 'image/jpeg', 0.9)
+      return
+    }
+
+    // Normal artwork capture → show cartel prompt
     canvas.toBlob((blob) => {
       const file = new File([blob], `batch-${Date.now()}.jpg`, { type: 'image/jpeg' })
+      const captureId = Date.now()
 
       const newCapture = {
-        id: Date.now(),
+        id: captureId,
         imageData: dataUrl,
         file,
+        cartelImageData: null,
+        cartelFile: null,
         status: BATCH_STATUS.PENDING,
+        waitingCartel: true, // Don't process yet
         data: null,
         error: null
       }
 
       setCaptures(prev => [...prev, newCapture])
+      setCartelPrompt(captureId)
     }, 'image/jpeg', 0.9)
+  }
+
+  function skipCartel() {
+    if (cartelPrompt) {
+      setCaptures(prev => prev.map(c =>
+        c.id === cartelPrompt ? { ...c, waitingCartel: false } : c
+      ))
+    }
+    setCartelPrompt(null)
+    setCapturingCartel(false)
+  }
+
+  function startCartelCapture() {
+    setCapturingCartel(true)
+  }
+
+  function confirmCartelAndContinue() {
+    if (cartelPrompt) {
+      setCaptures(prev => prev.map(c =>
+        c.id === cartelPrompt ? { ...c, waitingCartel: false } : c
+      ))
+    }
+    setCartelPrompt(null)
+    setCapturingCartel(false)
   }
 
   function handleFileSelect(e) {
@@ -167,9 +215,24 @@ export default function BatchScanMode({ onExit }) {
 
       const base64Data = capture.imageData.replace(/^data:image\/\w+;base64,/, '')
 
-      // Call AI enrichment
+      // OCR cartel if available
+      let cartelText = null
+      if (capture.cartelImageData) {
+        try {
+          cartelText = await extractText(capture.cartelImageData)
+        } catch (e) {
+          console.log('Cartel OCR failed:', e)
+        }
+      }
+
+      // Call AI enrichment with optional cartel text
+      const enrichBody = { imageBase64: base64Data }
+      if (cartelText) {
+        enrichBody.cartelText = cartelText
+      }
+
       const { data, error: fnError } = await supabase.functions.invoke('enrich-artwork', {
-        body: { imageBase64: base64Data }
+        body: enrichBody
       })
 
       if (fnError) throw fnError
@@ -189,7 +252,11 @@ export default function BatchScanMode({ onExit }) {
         c.id === captureId ? {
           ...c,
           status: BATCH_STATUS.READY,
-          data: { ...result, dominant_color: dominantColor }
+          data: {
+            ...result,
+            dominant_color: dominantColor,
+            cartel_raw_text: cartelText || null
+          }
         } : c
       ))
     } catch (err) {
@@ -269,7 +336,8 @@ export default function BatchScanMode({ onExit }) {
             museum_country: capture.data.museum_country || null,
             description: capture.data.description || null,
             curatorial_note: capture.data.curatorial_note || null,
-            dominant_color: capture.data.dominant_color || null
+            dominant_color: capture.data.dominant_color || null,
+            cartel_raw_text: capture.data.cartel_raw_text || null
           })
 
         if (insertError) throw insertError
@@ -378,6 +446,53 @@ export default function BatchScanMode({ onExit }) {
             <div className="flex items-center justify-center gap-2">
               <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
               <span>Analyse en cours... {analyzingCount + pendingCount} restante{(analyzingCount + pendingCount) > 1 ? 's' : ''}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Cartel prompt overlay */}
+        {cartelPrompt && !capturingCartel && (
+          <div className="absolute inset-x-4 bottom-48 z-30 animate-slide-up">
+            <div className="bg-black/80 backdrop-blur-md rounded-2xl p-5 border border-accent/30">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-accent">badge</span>
+                </div>
+                <div>
+                  <p className="text-white font-medium">Scanner le cartel ?</p>
+                  <p className="text-white/50 text-xs">Le cartel aide à identifier l'œuvre</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={skipCartel}
+                  className="flex-1 py-3 rounded-xl bg-white/10 text-white text-sm font-medium hover:bg-white/20 transition-all"
+                >
+                  Non, continuer
+                </button>
+                <button
+                  onClick={startCartelCapture}
+                  className="flex-1 py-3 rounded-xl bg-accent text-black text-sm font-medium hover:bg-accent/90 transition-all"
+                >
+                  Oui, scanner
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cartel capture mode indicator */}
+        {capturingCartel && (
+          <div className="absolute inset-x-4 bottom-48 z-30">
+            <div className="bg-accent/20 backdrop-blur-sm border border-accent/50 text-white px-4 py-3 rounded-xl text-center">
+              <p className="font-medium text-accent">Photographiez le cartel</p>
+              <p className="text-white/60 text-xs mt-1">Prenez en photo l'étiquette à côté de l'œuvre</p>
+              <button
+                onClick={confirmCartelAndContinue}
+                className="mt-3 px-4 py-2 rounded-lg bg-white/10 text-white text-xs hover:bg-white/20 transition-all"
+              >
+                Passer sans cartel
+              </button>
             </div>
           </div>
         )}
@@ -532,6 +647,15 @@ export default function BatchScanMode({ onExit }) {
                         <span className="material-symbols-outlined text-white text-3xl">error</span>
                       )}
                     </div>
+
+                    {/* Cartel badge */}
+                    {capture.cartelImageData && (
+                      <div className="absolute top-2 left-2">
+                        <span className="px-2 py-0.5 rounded-full bg-accent/80 text-black text-xs font-medium">
+                          Cartel
+                        </span>
+                      </div>
+                    )}
 
                     {/* Title (if analyzed) */}
                     {capture.data?.title && (
