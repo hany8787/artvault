@@ -296,11 +296,13 @@ export default function BatchScanMode({ onExit }) {
 
         {/* Header */}
         <div className="absolute top-0 inset-x-0 p-4 flex items-center justify-between z-10">
+          {/* Exit button with label */}
           <button
             onClick={onExit}
-            className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 transition-all"
           >
-            <span className="material-symbols-outlined">close</span>
+            <span className="material-symbols-outlined text-xl">close</span>
+            <span className="text-sm font-medium">Mode normal</span>
           </button>
 
           <div className="text-center">
@@ -312,12 +314,13 @@ export default function BatchScanMode({ onExit }) {
             </p>
           </div>
 
-          {/* Queue toggle */}
+          {/* Queue toggle with label */}
           <button
             onClick={() => setShowQueue(!showQueue)}
-            className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white relative"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 transition-all relative"
           >
-            <span className="material-symbols-outlined">queue</span>
+            <span className="material-symbols-outlined text-xl">queue</span>
+            <span className="text-sm font-medium">File</span>
             {captures.length > 0 && (
               <span className="absolute -top-1 -right-1 w-5 h-5 bg-accent text-xs font-bold text-black rounded-full flex items-center justify-center">
                 {captures.length}
@@ -354,18 +357,20 @@ export default function BatchScanMode({ onExit }) {
         )}
       </div>
 
-      {/* Bottom Controls */}
+      {/* Bottom Controls - IMPROVED UX */}
       <div className="absolute bottom-0 inset-x-0 pb-8 pt-4">
-        <div className="flex items-center justify-around px-8">
-          {/* Gallery */}
+        {/* Main actions row */}
+        <div className="flex items-center justify-center gap-4 px-4 mb-4">
+          {/* Gallery button with label */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white"
+            className="flex flex-col items-center gap-1.5 px-4 py-3 rounded-2xl bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 transition-all min-w-[80px]"
           >
             <span className="material-symbols-outlined text-2xl">photo_library</span>
+            <span className="text-xs font-medium">Galerie</span>
           </button>
 
-          {/* Capture */}
+          {/* Capture button */}
           <button
             onClick={capturePhoto}
             disabled={!cameraActive}
@@ -377,29 +382,59 @@ export default function BatchScanMode({ onExit }) {
             </div>
           </button>
 
-          {/* Save all */}
+          {/* Save all button with label */}
           <button
             onClick={saveAllArtworks}
             disabled={readyCount === 0 || saving}
-            className={`w-14 h-14 rounded-full flex items-center justify-center ${
-              readyCount > 0 ? 'bg-accent text-black' : 'bg-white/10 text-white/50'
+            className={`flex flex-col items-center gap-1.5 px-4 py-3 rounded-2xl transition-all min-w-[80px] ${
+              readyCount > 0 
+                ? 'bg-accent text-black hover:bg-accent/90' 
+                : 'bg-white/10 text-white/50 cursor-not-allowed'
             }`}
           >
             {saving ? (
-              <div className="animate-spin w-6 h-6 border-2 border-current border-t-transparent rounded-full" />
+              <>
+                <div className="animate-spin w-6 h-6 border-2 border-current border-t-transparent rounded-full" />
+                <span className="text-xs font-medium">Sauvegarde...</span>
+              </>
             ) : (
-              <span className="material-symbols-outlined text-2xl">save</span>
+              <>
+                <span className="material-symbols-outlined text-2xl">save</span>
+                <span className="text-xs font-medium">
+                  {readyCount > 0 ? `Sauver (${readyCount})` : 'Sauver'}
+                </span>
+              </>
             )}
           </button>
         </div>
 
         {/* Status bar */}
         {captures.length > 0 && (
-          <div className="mt-4 px-8 flex items-center justify-center gap-4 text-xs text-white/60">
-            {readyCount > 0 && <span className="text-green-400">{readyCount} prêt{readyCount > 1 ? 's' : ''}</span>}
-            {(pendingCount + analyzingCount) > 0 && <span className="text-accent">{pendingCount + analyzingCount} en cours</span>}
-            {errorCount > 0 && <span className="text-red-400">{errorCount} erreur{errorCount > 1 ? 's' : ''}</span>}
-            {savedCount > 0 && <span className="text-blue-400">{savedCount} sauvegardé{savedCount > 1 ? 's' : ''}</span>}
+          <div className="px-8 flex items-center justify-center gap-4 text-xs text-white/60">
+            {readyCount > 0 && (
+              <span className="flex items-center gap-1 text-green-400">
+                <span className="material-symbols-outlined text-sm">check_circle</span>
+                {readyCount} prêt{readyCount > 1 ? 's' : ''}
+              </span>
+            )}
+            {(pendingCount + analyzingCount) > 0 && (
+              <span className="flex items-center gap-1 text-accent">
+                <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                {pendingCount + analyzingCount} en cours
+              </span>
+            )}
+            {errorCount > 0 && (
+              <span className="flex items-center gap-1 text-red-400">
+                <span className="material-symbols-outlined text-sm">error</span>
+                {errorCount} erreur{errorCount > 1 ? 's' : ''}
+              </span>
+            )}
+            {savedCount > 0 && (
+              <span className="flex items-center gap-1 text-blue-400">
+                <span className="material-symbols-outlined text-sm">cloud_done</span>
+                {savedCount} sauvegardé{savedCount > 1 ? 's' : ''}
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -411,9 +446,10 @@ export default function BatchScanMode({ onExit }) {
             <h2 className="font-display text-xl italic text-white">File d'attente</h2>
             <button
               onClick={() => setShowQueue(false)}
-              className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white"
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all"
             >
               <span className="material-symbols-outlined">close</span>
+              <span className="text-sm">Fermer</span>
             </button>
           </div>
 
@@ -479,7 +515,8 @@ export default function BatchScanMode({ onExit }) {
                       {capture.status === BATCH_STATUS.ERROR && (
                         <button
                           onClick={() => retryCapture(capture.id)}
-                          className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white"
+                          className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/40 transition-all"
+                          title="Réessayer"
                         >
                           <span className="material-symbols-outlined text-sm">refresh</span>
                         </button>
@@ -487,7 +524,8 @@ export default function BatchScanMode({ onExit }) {
                       {capture.status !== BATCH_STATUS.SAVED && capture.status !== BATCH_STATUS.SAVING && (
                         <button
                           onClick={() => removeCapture(capture.id)}
-                          className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white"
+                          className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-red-500/50 transition-all"
+                          title="Supprimer"
                         >
                           <span className="material-symbols-outlined text-sm">close</span>
                         </button>
@@ -499,23 +537,23 @@ export default function BatchScanMode({ onExit }) {
             )}
           </div>
 
-          {/* Save all button */}
+          {/* Save all button - full width with clear label */}
           {readyCount > 0 && (
             <div className="p-4 border-t border-white/10">
               <button
                 onClick={saveAllArtworks}
                 disabled={saving}
-                className="btn btn-primary w-full"
+                className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl bg-accent text-black font-semibold text-lg hover:bg-accent/90 disabled:opacity-50 transition-all"
               >
                 {saving ? (
                   <>
                     <div className="animate-spin w-5 h-5 border-2 border-current border-t-transparent rounded-full" />
-                    Enregistrement...
+                    <span>Enregistrement en cours...</span>
                   </>
                 ) : (
                   <>
-                    <span className="material-symbols-outlined">save</span>
-                    Enregistrer {readyCount} œuvre{readyCount > 1 ? 's' : ''}
+                    <span className="material-symbols-outlined text-2xl">save</span>
+                    <span>Enregistrer {readyCount} œuvre{readyCount > 1 ? 's' : ''}</span>
                   </>
                 )}
               </button>
