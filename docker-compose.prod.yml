@@ -1,7 +1,6 @@
-version: "3.7"
 services:
   artvault:
     image: hanybal87/artvault:latest
     restart: always
     ports:
-      - "3001:80"
+      - "3002:80"
