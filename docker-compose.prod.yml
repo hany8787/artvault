@@ -4,7 +4,7 @@ services:
     restart: always
     labels:
       - traefik.enable=true
-      - traefik.http.routers.artvault.rule=Host(`artvault.srv865113.hstgr.cloud`)
+      - traefik.http.routers.artvault.rule=Host(`artvault.hdconseils.com`)
       - traefik.http.routers.artvault.entrypoints=websecure
       - traefik.http.routers.artvault.tls=true
       - traefik.http.routers.artvault.tls.certresolver=mytlschallenge
