@@ -3,4 +3,4 @@ services:
     image: hanybal87/artvault:latest
     restart: always
     ports:
-      - "3002:80"
+      - "3010:80"
