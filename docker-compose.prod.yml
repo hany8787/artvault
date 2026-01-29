@@ -10,8 +10,8 @@ services:
       - traefik.http.routers.artvault.tls.certresolver=mytlschallenge
       - traefik.http.services.artvault.loadbalancer.server.port=80
     networks:
-      - traefik-public
+      - root_default
 
 networks:
-  traefik-public:
+  root_default:
     external: true
