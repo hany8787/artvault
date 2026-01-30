@@ -370,7 +370,7 @@ export default function Collection() {
         {/* Search bar */}
         {showSearch && (
           <div className="relative animate-slide-up">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-secondary">
+            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-secondary pointer-events-none z-10">
               search
             </span>
             <input
@@ -378,7 +378,8 @@ export default function Collection() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Rechercher par titre, artiste ou musée..."
-              className="input pl-12"
+              className="input w-full"
+              style={{ paddingLeft: '3rem' }}
               autoFocus
             />
             {searchQuery && (

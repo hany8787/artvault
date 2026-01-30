@@ -146,7 +146,7 @@ export default function Museums() {
 
         {/* Search bar */}
         <div className="relative">
-          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10">
             search
           </span>
           <input
@@ -154,7 +154,8 @@ export default function Museums() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Rechercher un musée, une ville..."
-            className="input pl-12 w-full"
+            className="input w-full"
+            style={{ paddingLeft: '3rem' }}
           />
         </div>
 
