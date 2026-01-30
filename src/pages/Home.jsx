@@ -14,12 +14,29 @@ export default function Home() {
   const [exhibitionsLoading, setExhibitionsLoading] = useState(true)
   const [featuredMuseums, setFeaturedMuseums] = useState([])
   const [museumsLoading, setMuseumsLoading] = useState(true)
+  const [userLocation, setUserLocation] = useState(null)
 
   useEffect(() => {
     fetchData()
     fetchExhibitions()
-    fetchFeaturedMuseums()
+    // Get user location for museum recommendations
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          })
+        },
+        () => {} // Ignore errors
+      )
+    }
   }, [user])
+
+  // Fetch museums when we have collection data or location
+  useEffect(() => {
+    fetchFeaturedMuseums()
+  }, [user, recentArtworks, userLocation])
 
   async function fetchData() {
     if (!user) return
@@ -99,23 +116,79 @@ export default function Home() {
 
   async function fetchFeaturedMuseums() {
     try {
-      const { data, error } = await supabase
-        .from('museums')
-        .select('*')
-        .limit(4)
+      let recommendedMuseums = []
 
-      if (error) {
-        setFeaturedMuseums([])
-        return
+      // Strategy 1: Get museums from user's recent artworks
+      if (user && recentArtworks.length > 0) {
+        const museumNames = [...new Set(recentArtworks.map(a => a.museum).filter(Boolean))]
+        if (museumNames.length > 0) {
+          const { data: collectionMuseums } = await supabase
+            .from('museums')
+            .select('*')
+            .in('name', museumNames)
+            .limit(4)
+
+          if (collectionMuseums?.length > 0) {
+            recommendedMuseums = collectionMuseums
+          }
+        }
       }
 
-      setFeaturedMuseums(data || [])
+      // Strategy 2: If user has location, get nearby museums
+      if (recommendedMuseums.length < 4 && userLocation) {
+        const { data: nearbyMuseums } = await supabase
+          .from('museums')
+          .select('*')
+          .not('latitude', 'is', null)
+          .limit(20)
+
+        if (nearbyMuseums?.length > 0) {
+          // Sort by distance and take closest ones
+          const withDistance = nearbyMuseums.map(m => ({
+            ...m,
+            distance: getDistance(userLocation.lat, userLocation.lng, m.latitude, m.longitude)
+          })).sort((a, b) => a.distance - b.distance)
+
+          const existingIds = new Set(recommendedMuseums.map(m => m.id))
+          const nearby = withDistance.filter(m => !existingIds.has(m.id)).slice(0, 4 - recommendedMuseums.length)
+          recommendedMuseums = [...recommendedMuseums, ...nearby]
+        }
+      }
+
+      // Strategy 3: Fall back to famous Paris museums
+      if (recommendedMuseums.length < 4) {
+        const famousNames = ['Musée du Louvre', 'Musée d\'Orsay', 'Centre Pompidou', 'Musée de l\'Orangerie']
+        const { data: famousMuseums } = await supabase
+          .from('museums')
+          .select('*')
+          .in('name', famousNames)
+          .limit(4 - recommendedMuseums.length)
+
+        if (famousMuseums?.length > 0) {
+          const existingIds = new Set(recommendedMuseums.map(m => m.id))
+          const famous = famousMuseums.filter(m => !existingIds.has(m.id))
+          recommendedMuseums = [...recommendedMuseums, ...famous]
+        }
+      }
+
+      setFeaturedMuseums(recommendedMuseums.slice(0, 4))
     } catch (err) {
       console.error('Error fetching featured museums:', err)
       setFeaturedMuseums([])
     } finally {
       setMuseumsLoading(false)
     }
+  }
+
+  // Calculate distance between two points (Haversine formula)
+  function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371 // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLon = (lon2 - lon1) * Math.PI / 180
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   }
 
   function formatDateRange(startDate, endDate) {
@@ -175,29 +248,32 @@ export default function Home() {
       {/* Comment ça marche - Compact */}
       <section className="px-4 py-6">
         <div className="max-w-lg mx-auto">
-          <h2 className="font-display text-xl text-primary dark:text-white mb-4 text-center">Comment ça marche</h2>
+          <h2 className="font-display text-2xl text-primary dark:text-white mb-5 text-center">Comment ça marche</h2>
 
           <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
-            <div className="flex-shrink-0 w-40 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 text-center">
-              <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-accent/10 flex items-center justify-center">
-                <span className="material-symbols-outlined text-xl text-accent">photo_camera</span>
+            <div className="flex-shrink-0 w-44 bg-white dark:bg-surface-dark rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 text-center relative">
+              <div className="absolute -top-2 -left-2 w-7 h-7 rounded-full bg-accent flex items-center justify-center text-sm font-bold text-white">1</div>
+              <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-accent/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-3xl text-accent">photo_camera</span>
               </div>
-              <h3 className="font-medium text-sm text-primary dark:text-white mb-1">Photographiez</h3>
-              <p className="text-xs text-secondary">Capturez l'œuvre</p>
+              <h3 className="font-semibold text-base text-primary dark:text-white mb-1">Photographiez</h3>
+              <p className="text-sm text-secondary">Capturez l'œuvre</p>
             </div>
-            <div className="flex-shrink-0 w-40 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 text-center">
-              <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                <span className="material-symbols-outlined text-xl text-purple-500">auto_awesome</span>
+            <div className="flex-shrink-0 w-44 bg-white dark:bg-surface-dark rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 text-center relative">
+              <div className="absolute -top-2 -left-2 w-7 h-7 rounded-full bg-purple-500 flex items-center justify-center text-sm font-bold text-white">2</div>
+              <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                <span className="material-symbols-outlined text-3xl text-purple-500">auto_awesome</span>
               </div>
-              <h3 className="font-medium text-sm text-primary dark:text-white mb-1">Identifiez</h3>
-              <p className="text-xs text-secondary">L'IA reconnaît</p>
+              <h3 className="font-semibold text-base text-primary dark:text-white mb-1">Identifiez</h3>
+              <p className="text-sm text-secondary">L'IA reconnaît</p>
             </div>
-            <div className="flex-shrink-0 w-40 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 text-center">
-              <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                <span className="material-symbols-outlined text-xl text-blue-500">collections</span>
+            <div className="flex-shrink-0 w-44 bg-white dark:bg-surface-dark rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 text-center relative">
+              <div className="absolute -top-2 -left-2 w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-sm font-bold text-white">3</div>
+              <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <span className="material-symbols-outlined text-3xl text-blue-500">collections</span>
               </div>
-              <h3 className="font-medium text-sm text-primary dark:text-white mb-1">Collectionnez</h3>
-              <p className="text-xs text-secondary">Votre galerie</p>
+              <h3 className="font-semibold text-base text-primary dark:text-white mb-1">Collectionnez</h3>
+              <p className="text-sm text-secondary">Votre galerie</p>
             </div>
           </div>
         </div>
@@ -206,30 +282,30 @@ export default function Home() {
       {/* Ma Collection - Quick Stats */}
       <section className="px-4 py-6">
         <div className="max-w-lg mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-xl text-primary dark:text-white">Ma Collection</h2>
-            <Link to="/collection" className="text-accent text-sm font-medium flex items-center gap-1">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="font-display text-2xl text-primary dark:text-white">Ma Collection</h2>
+            <Link to="/collection" className="text-accent font-medium flex items-center gap-1">
               Voir tout
-              <span className="material-symbols-outlined text-lg">chevron_right</span>
+              <span className="material-symbols-outlined text-xl">chevron_right</span>
             </Link>
           </div>
 
           {/* Stats Cards - Horizontal scroll */}
-          <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar mb-4">
-            <Link to="/collection" className="flex-shrink-0 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 min-w-[120px]">
-              <span className="material-symbols-outlined text-2xl text-accent mb-2">collections</span>
-              <p className="text-2xl font-bold text-primary dark:text-white">{stats.total}</p>
-              <p className="text-xs text-secondary">œuvres</p>
+          <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar mb-5">
+            <Link to="/collection" className="flex-shrink-0 bg-white dark:bg-surface-dark rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 min-w-[130px]">
+              <span className="material-symbols-outlined text-3xl text-accent mb-2">collections</span>
+              <p className="text-3xl font-bold text-primary dark:text-white">{stats.total}</p>
+              <p className="text-sm text-secondary">œuvres</p>
             </Link>
-            <div className="flex-shrink-0 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 min-w-[120px]">
-              <span className="material-symbols-outlined text-2xl text-purple-500 mb-2">palette</span>
-              <p className="text-2xl font-bold text-primary dark:text-white">{stats.artists}</p>
-              <p className="text-xs text-secondary">artistes</p>
+            <div className="flex-shrink-0 bg-white dark:bg-surface-dark rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 min-w-[130px]">
+              <span className="material-symbols-outlined text-3xl text-purple-500 mb-2">palette</span>
+              <p className="text-3xl font-bold text-primary dark:text-white">{stats.artists}</p>
+              <p className="text-sm text-secondary">artistes</p>
             </div>
-            <div className="flex-shrink-0 bg-white dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 min-w-[120px]">
-              <span className="material-symbols-outlined text-2xl text-blue-500 mb-2">museum</span>
-              <p className="text-2xl font-bold text-primary dark:text-white">{stats.museums}</p>
-              <p className="text-xs text-secondary">musées</p>
+            <div className="flex-shrink-0 bg-white dark:bg-surface-dark rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 min-w-[130px]">
+              <span className="material-symbols-outlined text-3xl text-blue-500 mb-2">museum</span>
+              <p className="text-3xl font-bold text-primary dark:text-white">{stats.museums}</p>
+              <p className="text-sm text-secondary">musées</p>
             </div>
           </div>
 
@@ -265,11 +341,11 @@ export default function Home() {
       {/* Actualités / Expositions */}
       <section className="px-4 py-6">
         <div className="max-w-lg mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-xl text-primary dark:text-white">Actualités</h2>
-            <Link to="/news" className="text-accent text-sm font-medium flex items-center gap-1">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="font-display text-2xl text-primary dark:text-white">Actualités</h2>
+            <Link to="/news" className="text-accent font-medium flex items-center gap-1">
               Voir tout
-              <span className="material-symbols-outlined text-lg">chevron_right</span>
+              <span className="material-symbols-outlined text-xl">chevron_right</span>
             </Link>
           </div>
 
@@ -333,11 +409,11 @@ export default function Home() {
       {/* Musées à découvrir */}
       <section className="px-4 py-6">
         <div className="max-w-lg mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-xl text-primary dark:text-white">Musées</h2>
-            <Link to="/museums" className="text-accent text-sm font-medium flex items-center gap-1">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="font-display text-2xl text-primary dark:text-white">Musées recommandés</h2>
+            <Link to="/museums" className="text-accent font-medium flex items-center gap-1">
               Explorer
-              <span className="material-symbols-outlined text-lg">chevron_right</span>
+              <span className="material-symbols-outlined text-xl">chevron_right</span>
             </Link>
           </div>
 
@@ -355,8 +431,8 @@ export default function Home() {
               {featuredMuseums.map((museum) => (
                 <Link
                   key={museum.id}
-                  to={`/museums/${museum.id}`}
-                  className="flex-shrink-0 w-48 bg-white dark:bg-surface-dark rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow group"
+                  to={`/museum/${museum.id}`}
+                  className="flex-shrink-0 w-52 bg-white dark:bg-surface-dark rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow group"
                 >
                   <div className="aspect-[4/3] overflow-hidden bg-gray-100 dark:bg-gray-800">
                     {museum.image_url ? (
