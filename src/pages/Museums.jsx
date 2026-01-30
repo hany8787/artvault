@@ -10,6 +10,7 @@ const MuseumMap = lazy(() => import('../components/MuseumMap'))
 
 export default function Museums() {
   const [museums, setMuseums] = useState([])
+  const [totalCount, setTotalCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState('list') // list, map
   const [userLocation, setUserLocation] = useState(null)
@@ -23,10 +24,19 @@ export default function Museums() {
 
   async function fetchMuseums() {
     try {
+      // Get exact count first
+      const { count } = await supabase
+        .from('museums')
+        .select('*', { count: 'exact', head: true })
+
+      setTotalCount(count || 0)
+
+      // Fetch all museums (Supabase default limit is 1000, need to increase)
       const { data, error } = await supabase
         .from('museums')
         .select('*')
         .order('name')
+        .range(0, 2999) // Get up to 3000 museums
 
       if (error) throw error
       setMuseums(data || [])
@@ -109,10 +119,10 @@ export default function Museums() {
             <h1 className="text-2xl font-display font-bold italic">Musées</h1>
             <p className="text-gray-600 dark:text-gray-400">
               {userLocation
-                ? `${museumsWithCoords.length} musées trouvés`
+                ? `${museumsWithCoords.length} musées à proximité`
                 : locationLoading
                 ? 'Localisation en cours...'
-                : `${museums.length} musées dans le monde`
+                : `${totalCount || museums.length} musées dans le monde`
               }
             </p>
           </div>
@@ -136,7 +146,7 @@ export default function Museums() {
 
         {/* Search bar */}
         <div className="relative">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
             search
           </span>
           <input
@@ -144,7 +154,7 @@ export default function Museums() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Rechercher un musée, une ville..."
-            className="input pl-10 w-full"
+            className="input pl-12 w-full"
           />
         </div>
 

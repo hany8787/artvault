@@ -14,11 +14,14 @@ export default function MuseumDetail() {
   const [manualExhibitions, setManualExhibitions] = useState([])
   const [loadingExhibitions, setLoadingExhibitions] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    fetchMuseum()
-    fetchArtworks()
-  }, [id])
+    if (id) {
+      fetchMuseum()
+      fetchArtworks()
+    }
+  }, [id, user])
 
   // Fetch exhibitions when museum is loaded
   useEffect(() => {
@@ -29,16 +32,25 @@ export default function MuseumDetail() {
   }, [museum])
 
   async function fetchMuseum() {
-    const { data, error } = await supabase
-      .from('museums')
-      .select('*')
-      .eq('id', id)
-      .single()
+    try {
+      const { data, error: dbError } = await supabase
+        .from('museums')
+        .select('*')
+        .eq('id', id)
+        .single()
 
-    if (!error) {
-      setMuseum(data)
+      if (dbError) {
+        console.error('Error fetching museum:', dbError)
+        setError(dbError.message)
+      } else {
+        setMuseum(data)
+      }
+    } catch (err) {
+      console.error('Unexpected error fetching museum:', err)
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   async function fetchArtworks() {
@@ -165,10 +177,26 @@ export default function MuseumDetail() {
     )
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <span className="material-symbols-outlined text-4xl text-danger mb-2">error</span>
+        <p className="text-secondary mb-4">Erreur: {error}</p>
+        <Link to="/museums" className="btn btn-primary">
+          Retour aux musées
+        </Link>
+      </div>
+    )
+  }
+
   if (!museum) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-secondary">Musée non trouvé</p>
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <span className="material-symbols-outlined text-4xl text-secondary mb-2">museum</span>
+        <p className="text-secondary mb-4">Musée non trouvé</p>
+        <Link to="/museums" className="btn btn-primary">
+          Retour aux musées
+        </Link>
       </div>
     )
   }
@@ -218,10 +246,10 @@ export default function MuseumDetail() {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-bg-light dark:from-bg-dark to-transparent" />
 
-        {/* Back button */}
+        {/* Back button - with safe-area for iPhone notch */}
         <Link
           to="/museums"
-          className="absolute top-4 left-4 btn btn-ghost btn-icon glass"
+          className="absolute top-[max(1rem,env(safe-area-inset-top))] left-4 btn btn-ghost btn-icon glass"
         >
           <span className="material-symbols-outlined">arrow_back</span>
         </Link>
