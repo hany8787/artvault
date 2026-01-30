@@ -143,19 +143,60 @@ export default function Scan() {
   async function startCamera(target = 'artwork') {
     try {
       setCameraTarget(target)
+      setError('')
+
+      // Check if mediaDevices is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError('Votre navigateur ne supporte pas l\'accès à la caméra. Utilisez Safari sur iOS.')
+        return
+      }
+
+      // Request camera permission
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'environment',
+          facingMode: { ideal: 'environment' },
           width: { ideal: 1920 },
           height: { ideal: 1080 }
         }
       })
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream
+        // Wait for video to be ready
+        await new Promise((resolve) => {
+          videoRef.current.onloadedmetadata = resolve
+        })
         setCameraActive(true)
       }
     } catch (err) {
-      setError('Accès à la caméra refusé. Veuillez autoriser l\'accès ou importer une photo.')
+      console.error('Camera error:', err.name, err.message)
+
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        // Permission denied
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+        if (isIOS) {
+          setError('Caméra refusée. Allez dans Réglages > Safari > Caméra et autorisez l\'accès, puis rechargez la page.')
+        } else {
+          setError('Accès caméra refusé. Cliquez sur l\'icône 🔒 dans la barre d\'adresse pour autoriser.')
+        }
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        setError('Aucune caméra détectée. Utilisez le bouton galerie pour importer une photo.')
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        setError('La caméra est utilisée par une autre application. Fermez-la et réessayez.')
+      } else if (err.name === 'OverconstrainedError') {
+        // Try again with simpler constraints
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream
+            setCameraActive(true)
+          }
+        } catch {
+          setError('Impossible d\'accéder à la caméra. Importez une photo depuis la galerie.')
+        }
+      } else {
+        setError('Erreur caméra. Importez une photo depuis la galerie.')
+      }
     }
   }
 
@@ -698,8 +739,8 @@ export default function Scan() {
           <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/80 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/90 to-transparent" />
 
-          {/* Header */}
-          <div className="absolute top-0 inset-x-0 p-4 z-10">
+          {/* Header - with safe-area for iPhone notch */}
+          <div className="absolute top-0 inset-x-0 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-2 z-10">
             <div className="flex items-center justify-between mb-2">
               <Link
                 to="/collection"
@@ -839,7 +880,7 @@ export default function Scan() {
         </div>
 
         {/* Header */}
-        <div className="relative z-10 p-4">
+        <div className="relative z-10 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-2">
           <div className="flex items-center justify-between mb-2">
             <button
               onClick={() => setStep('artwork')}
@@ -934,8 +975,8 @@ export default function Scan() {
           <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/80 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/90 to-transparent" />
 
-          {/* Header */}
-          <div className="absolute top-0 inset-x-0 p-4 z-10">
+          {/* Header - with safe-area for iPhone notch */}
+          <div className="absolute top-0 inset-x-0 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-2 z-10">
             <div className="flex items-center justify-between mb-2">
               <button
                 onClick={() => {
@@ -1051,7 +1092,7 @@ export default function Scan() {
         </div>
 
         {/* Header */}
-        <div className="relative z-10 p-4">
+        <div className="relative z-10 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-2">
           <div className="flex items-center justify-between mb-2">
             <button
               onClick={() => setStep(cartelImageData ? 'cartel-capture' : 'cartel-prompt')}
@@ -1137,7 +1178,7 @@ export default function Scan() {
         </div>
 
         {/* Header */}
-        <div className="relative z-10 p-4">
+        <div className="relative z-10 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-2">
           <ProgressIndicator />
         </div>
 

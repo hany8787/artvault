@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 /**
  * PWA Install Prompt Banner
  * Affiche une bannière pour installer l'app sur mobile
+ * Supporte les modes light et dark
  */
 export function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState(null)
@@ -12,7 +13,7 @@ export function InstallPrompt() {
 
   useEffect(() => {
     // Check if already installed
-    const standalone = window.matchMedia('(display-mode: standalone)').matches 
+    const standalone = window.matchMedia('(display-mode: standalone)').matches
       || window.navigator.standalone === true
     setIsStandalone(standalone)
 
@@ -63,7 +64,7 @@ export function InstallPrompt() {
 
   return (
     <div className="fixed bottom-20 md:bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-sm z-50 animate-slide-up">
-      <div className="bg-surface-dark border border-white/10 rounded-xl p-4 shadow-2xl backdrop-blur-xl">
+      <div className="bg-white dark:bg-surface-dark border border-neutral-200 dark:border-white/10 rounded-xl p-4 shadow-2xl backdrop-blur-xl">
         <div className="flex items-start gap-3">
           {/* Icon */}
           <div className="w-12 h-12 rounded-xl bg-accent/20 flex items-center justify-center flex-shrink-0">
@@ -72,13 +73,13 @@ export function InstallPrompt() {
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-white mb-1">Installer ArtVault</h3>
+            <h3 className="font-semibold text-neutral-900 dark:text-white mb-1">Installer ArtVault</h3>
             {isIOS ? (
-              <p className="text-sm text-white/60">
+              <p className="text-sm text-neutral-600 dark:text-white/60">
                 Appuyez sur <span className="inline-flex items-center"><span className="material-symbols-outlined text-sm align-middle">ios_share</span></span> puis "Sur l'écran d'accueil"
               </p>
             ) : (
-              <p className="text-sm text-white/60">
+              <p className="text-sm text-neutral-600 dark:text-white/60">
                 Ajoutez l'app sur votre écran d'accueil pour un accès rapide
               </p>
             )}
@@ -87,7 +88,7 @@ export function InstallPrompt() {
           {/* Close */}
           <button
             onClick={handleDismiss}
-            className="text-white/40 hover:text-white p-1"
+            className="text-neutral-400 dark:text-white/40 hover:text-neutral-600 dark:hover:text-white p-1"
           >
             <span className="material-symbols-outlined text-xl">close</span>
           </button>
@@ -95,10 +96,10 @@ export function InstallPrompt() {
 
         {/* Action buttons */}
         {!isIOS && deferredPrompt && (
-          <div className="flex gap-2 mt-3 pt-3 border-t border-white/10">
+          <div className="flex gap-2 mt-3 pt-3 border-t border-neutral-200 dark:border-white/10">
             <button
               onClick={handleDismiss}
-              className="flex-1 py-2 text-sm text-white/60 hover:text-white transition-colors"
+              className="flex-1 py-2 text-sm text-neutral-600 dark:text-white/60 hover:text-neutral-900 dark:hover:text-white transition-colors"
             >
               Plus tard
             </button>
