@@ -1,6 +1,6 @@
 /**
  * Museum Import Component
- * Search and import artworks from 6+ museum open-access APIs
+ * Search and import artworks from 10+ museum open-access APIs
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -29,7 +29,11 @@ const SOURCE_COLORS = {
   rijksmuseum: 'bg-orange-500/80',
   cleveland: 'bg-emerald-500/80',
   harvard: 'bg-purple-500/80',
-  va: 'bg-pink-500/80'
+  va: 'bg-pink-500/80',
+  europeana: 'bg-yellow-500/80',
+  smithsonian: 'bg-cyan-500/80',
+  walters: 'bg-indigo-500/80',
+  brooklyn: 'bg-rose-500/80'
 }
 
 const SOURCE_LABELS = {
@@ -38,7 +42,11 @@ const SOURCE_LABELS = {
   rijksmuseum: 'Rijks',
   cleveland: 'CMA',
   harvard: 'Harvard',
-  va: 'V&A'
+  va: 'V&A',
+  europeana: 'EU',
+  smithsonian: 'Smith',
+  walters: 'Walters',
+  brooklyn: 'BKM'
 }
 
 export default function GoogleArtsImport({ onClose, onImportComplete }) {

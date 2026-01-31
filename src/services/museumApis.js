@@ -224,6 +224,156 @@ export async function searchVA(query, limit = 24) {
     }))
 }
 
+// ─── Europeana ─────────────────────────────────────────────────────────────
+
+const EUROPEANA_BASE = 'https://api.europeana.eu/record/v2'
+const EUROPEANA_KEY = 'api2demo' // Free demo key
+
+export async function searchEuropeana(query, limit = 24) {
+  try {
+    const res = await fetch(
+      `${EUROPEANA_BASE}/search.json?wskey=${EUROPEANA_KEY}&query=${encodeURIComponent(query)}&qf=TYPE:IMAGE&qf=REUSABILITY:open&rows=${limit}&profile=rich`
+    )
+    if (!res.ok) throw new Error('Europeana search failed')
+    const json = await res.json()
+    return (json.items || [])
+      .filter(item => item.edmIsShownBy && item.edmIsShownBy[0])
+      .map(item => {
+        // Extract museum/institution from provider
+        const provider = item.dataProvider?.[0] || item.provider?.[0] || 'European Museum'
+        const country = item.country?.[0] || 'Europe'
+        return {
+          id: `europeana-${item.id?.replace(/\//g, '-')}`,
+          title: item.title?.[0] || 'Sans titre',
+          artist: item.dcCreator?.[0] || 'Artiste inconnu',
+          year: item.year?.[0] || '',
+          museum: provider,
+          museum_city: '',
+          museum_country: country,
+          medium: item.dcType?.[0] || '',
+          dimensions: '',
+          image_url: item.edmIsShownBy[0],
+          source: 'europeana'
+        }
+      })
+  } catch (error) {
+    console.error('Europeana search error:', error)
+    return []
+  }
+}
+
+// ─── Smithsonian (Open Access) ──────────────────────────────────────────────
+
+const SMITHSONIAN_BASE = 'https://api.si.edu/openaccess/api/v1.0'
+const SMITHSONIAN_KEY = '' // No key needed for basic search
+
+export async function searchSmithsonian(query, limit = 24) {
+  try {
+    const res = await fetch(
+      `${SMITHSONIAN_BASE}/search?q=${encodeURIComponent(query)}&rows=${limit}&api_key=${SMITHSONIAN_KEY || 'helloworld'}`
+    )
+    if (!res.ok) throw new Error('Smithsonian search failed')
+    const json = await res.json()
+    return (json.response?.rows || [])
+      .filter(item => {
+        const media = item.content?.descriptiveNonRepeating?.online_media?.media
+        return media && media[0]?.content
+      })
+      .map(item => {
+        const content = item.content
+        const desc = content?.descriptiveNonRepeating
+        const indexed = content?.indexedStructured
+        const freetext = content?.freetext
+        const media = desc?.online_media?.media?.[0]
+        return {
+          id: `smithsonian-${item.id}`,
+          title: desc?.title?.content || 'Sans titre',
+          artist: indexed?.name?.[0] || freetext?.name?.[0]?.content || 'Artiste inconnu',
+          year: indexed?.date?.[0] || '',
+          museum: desc?.unit_code || 'Smithsonian Institution',
+          museum_city: 'Washington D.C.',
+          museum_country: 'États-Unis',
+          medium: indexed?.object_type?.[0] || '',
+          dimensions: '',
+          image_url: media?.content || '',
+          source: 'smithsonian'
+        }
+      })
+  } catch (error) {
+    console.error('Smithsonian search error:', error)
+    return []
+  }
+}
+
+// ─── Walters Art Museum ─────────────────────────────────────────────────────
+
+const WALTERS_BASE = 'https://api.thewalters.org/v1'
+
+export async function searchWalters(query, limit = 24) {
+  try {
+    const res = await fetch(
+      `${WALTERS_BASE}/objects?Title=${encodeURIComponent(query)}&pageSize=${limit}`
+    )
+    if (!res.ok) throw new Error('Walters search failed')
+    const json = await res.json()
+    return (json.Items || [])
+      .filter(item => item.PrimaryImage?.Tiny)
+      .map(item => ({
+        id: `walters-${item.ObjectID}`,
+        title: item.Title || 'Sans titre',
+        artist: item.Creator || 'Artiste inconnu',
+        year: item.DateText || '',
+        museum: 'The Walters Art Museum',
+        museum_city: 'Baltimore',
+        museum_country: 'États-Unis',
+        medium: item.Medium || '',
+        dimensions: item.Dimensions || '',
+        image_url: item.PrimaryImage.Large || item.PrimaryImage.Medium || item.PrimaryImage.Tiny,
+        source: 'walters'
+      }))
+  } catch (error) {
+    console.error('Walters search error:', error)
+    return []
+  }
+}
+
+// ─── Brooklyn Museum ────────────────────────────────────────────────────────
+
+const BROOKLYN_BASE = 'https://www.brooklynmuseum.org/api/v2'
+
+export async function searchBrooklyn(query, limit = 24) {
+  try {
+    const res = await fetch(
+      `${BROOKLYN_BASE}/object?keyword=${encodeURIComponent(query)}&limit=${limit}&has_images=1`,
+      {
+        headers: {
+          'api_key': 'r7NkIVzNAH2aNkBB9j8W' // Public API key
+        }
+      }
+    )
+    if (!res.ok) throw new Error('Brooklyn search failed')
+    const json = await res.json()
+    return (json.data || [])
+      .filter(item => item.primary_image)
+      .map(item => ({
+        id: `brooklyn-${item.id}`,
+        title: item.title || 'Sans titre',
+        artist: item.artists?.[0]?.name || 'Artiste inconnu',
+        year: item.object_date || '',
+        museum: 'Brooklyn Museum',
+        museum_city: 'New York',
+        museum_country: 'États-Unis',
+        medium: item.medium || '',
+        dimensions: item.dimensions || '',
+        image_url: `https://d1lfxha3ugu3d4.cloudfront.net/images/opencollection/objects/size4/${item.primary_image}`,
+        source: 'brooklyn'
+      }))
+  } catch (error) {
+    console.error('Brooklyn search error:', error)
+    return []
+  }
+}
+
 // ─── Unified Search ─────────────────────────────────────────────────────────
 
 /**
@@ -237,6 +387,10 @@ export const MUSEUM_SOURCES = [
   { id: 'cleveland', name: 'Cleveland Museum', icon: 'museum', city: 'Cleveland', search: searchCleveland },
   { id: 'harvard', name: 'Harvard Art Museums', icon: 'museum', city: 'Cambridge', search: searchHarvard },
   { id: 'va', name: 'V&A Museum', icon: 'museum', city: 'Londres', search: searchVA },
+  { id: 'europeana', name: 'Europeana', icon: 'public', city: 'Europe', search: searchEuropeana },
+  { id: 'smithsonian', name: 'Smithsonian', icon: 'museum', city: 'Washington', search: searchSmithsonian },
+  { id: 'walters', name: 'Walters Art Museum', icon: 'museum', city: 'Baltimore', search: searchWalters },
+  { id: 'brooklyn', name: 'Brooklyn Museum', icon: 'museum', city: 'New York', search: searchBrooklyn },
 ]
 
 /**
@@ -249,7 +403,7 @@ export const MUSEUM_SOURCES = [
 export async function searchMuseums(query, sourceId = 'all', limit = 24) {
   if (sourceId === 'all') {
     // Search all sources in parallel, limit per source
-    const perSource = Math.ceil(limit / 5)
+    const perSource = Math.ceil(limit / 8)
     const results = await Promise.allSettled([
       searchAIC(query, perSource),
       searchMet(query, perSource),
@@ -257,6 +411,10 @@ export async function searchMuseums(query, sourceId = 'all', limit = 24) {
       searchCleveland(query, perSource),
       searchHarvard(query, perSource),
       searchVA(query, perSource),
+      searchEuropeana(query, perSource),
+      searchSmithsonian(query, perSource),
+      searchWalters(query, perSource),
+      searchBrooklyn(query, perSource),
     ])
 
     const allArtworks = []
