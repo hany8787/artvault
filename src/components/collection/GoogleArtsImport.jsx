@@ -180,17 +180,20 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
 
       if (count === 0) {
         setError('Aucune œuvre importée. Elles existent peut-être déjà dans votre collection.')
+        setImporting(false)
         return
       }
 
       setSuccess(true)
+      setImporting(false)
+
+      // Fermer la modal après un délai
       setTimeout(() => {
         if (onImportComplete) onImportComplete()
-      }, 1500)
+      }, 2000)
     } catch (err) {
       console.error('Import failed:', err)
-      setError('Erreur lors de l\'import. Veuillez réessayer.')
-    } finally {
+      setError(`Erreur: ${err.message || 'Import échoué'}. Veuillez réessayer.`)
       setImporting(false)
     }
   }
@@ -220,7 +223,7 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
         {/* Search */}
         <div className="p-4 border-b border-primary/10 space-y-3">
           <div className="relative">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary">
+            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-secondary pointer-events-none z-10">
               search
             </span>
             <input
@@ -228,7 +231,8 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Monet, impressionnisme, portrait, nature morte..."
-              className="input pl-10 w-full"
+              className="input w-full"
+              style={{ paddingLeft: '3rem' }}
             />
             {searching && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
