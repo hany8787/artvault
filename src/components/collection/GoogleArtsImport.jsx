@@ -1,6 +1,6 @@
 /**
  * Museum Import Component
- * Search and import artworks from 6+ museum open-access APIs
+ * Search and import artworks from 10+ museum open-access APIs
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -29,7 +29,11 @@ const SOURCE_COLORS = {
   rijksmuseum: 'bg-orange-500/80',
   cleveland: 'bg-emerald-500/80',
   harvard: 'bg-purple-500/80',
-  va: 'bg-pink-500/80'
+  va: 'bg-pink-500/80',
+  europeana: 'bg-yellow-500/80',
+  smithsonian: 'bg-cyan-500/80',
+  walters: 'bg-indigo-500/80',
+  brooklyn: 'bg-rose-500/80'
 }
 
 const SOURCE_LABELS = {
@@ -38,7 +42,11 @@ const SOURCE_LABELS = {
   rijksmuseum: 'Rijks',
   cleveland: 'CMA',
   harvard: 'Harvard',
-  va: 'V&A'
+  va: 'V&A',
+  europeana: 'EU',
+  smithsonian: 'Smith',
+  walters: 'Walters',
+  brooklyn: 'BKM'
 }
 
 export default function GoogleArtsImport({ onClose, onImportComplete }) {
@@ -180,17 +188,20 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
 
       if (count === 0) {
         setError('Aucune œuvre importée. Elles existent peut-être déjà dans votre collection.')
+        setImporting(false)
         return
       }
 
       setSuccess(true)
+      setImporting(false)
+
+      // Fermer la modal après un délai
       setTimeout(() => {
         if (onImportComplete) onImportComplete()
-      }, 1500)
+      }, 2000)
     } catch (err) {
       console.error('Import failed:', err)
-      setError('Erreur lors de l\'import. Veuillez réessayer.')
-    } finally {
+      setError(`Erreur: ${err.message || 'Import échoué'}. Veuillez réessayer.`)
       setImporting(false)
     }
   }
@@ -220,7 +231,7 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
         {/* Search */}
         <div className="p-4 border-b border-primary/10 space-y-3">
           <div className="relative">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary">
+            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-secondary pointer-events-none z-10">
               search
             </span>
             <input
@@ -228,7 +239,8 @@ export default function GoogleArtsImport({ onClose, onImportComplete }) {
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
               placeholder="Monet, impressionnisme, portrait, nature morte..."
-              className="input pl-10 w-full"
+              className="input w-full"
+              style={{ paddingLeft: '3rem' }}
             />
             {searching && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">

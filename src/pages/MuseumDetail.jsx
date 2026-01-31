@@ -15,6 +15,7 @@ export default function MuseumDetail() {
   const [loadingExhibitions, setLoadingExhibitions] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [generatingDescription, setGeneratingDescription] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -154,6 +155,51 @@ export default function MuseumDetail() {
     if (!museum) return
     const query = encodeURIComponent(`${museum.name}, ${museum.address || museum.city}`)
     window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank')
+  }
+
+  async function generateDescription() {
+    if (generatingDescription || !museum) return
+    setGeneratingDescription(true)
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-museum-description`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
+            museum_name: museum.name,
+            city: museum.city,
+            country: museum.country,
+            website: museum.website
+          })
+        }
+      )
+
+      if (!response.ok) throw new Error('Generation failed')
+
+      const { description } = await response.json()
+
+      if (description) {
+        // Update in database
+        const { error: updateError } = await supabase
+          .from('museums')
+          .update({ description })
+          .eq('id', museum.id)
+
+        if (!updateError) {
+          setMuseum(prev => ({ ...prev, description }))
+        }
+      }
+    } catch (err) {
+      console.error('Error generating description:', err)
+      alert('Erreur lors de la génération. Réessayez.')
+    } finally {
+      setGeneratingDescription(false)
+    }
   }
 
   function formatDateRange(startDate, endDate) {
@@ -311,12 +357,36 @@ export default function MuseumDetail() {
           </div>
 
           {/* Description */}
-          {museum.description && (
-            <div className="mb-6">
-              <h2 className="label mb-2">À propos</h2>
+          <div className="mb-6">
+            <h2 className="label mb-2">À propos</h2>
+            {museum.description ? (
               <p className="text-secondary leading-relaxed">{museum.description}</p>
-            </div>
-          )}
+            ) : (
+              <div className="bg-accent/5 border border-accent/20 rounded-xl p-4 text-center">
+                <span className="material-symbols-outlined text-2xl text-accent/60 mb-2">auto_awesome</span>
+                <p className="text-secondary text-sm mb-3">
+                  Aucune description disponible pour ce musée.
+                </p>
+                <button
+                  onClick={generateDescription}
+                  disabled={generatingDescription}
+                  className="btn btn-outline btn-sm gap-2"
+                >
+                  {generatingDescription ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+                      Génération IA...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                      Générer avec l'IA
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Actions */}
           <button onClick={openMaps} className="btn btn-primary w-full">

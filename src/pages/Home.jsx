@@ -251,28 +251,28 @@ export default function Home() {
           <h2 className="font-display text-2xl text-primary dark:text-white mb-5 text-center">Comment ça marche</h2>
 
           <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
-            <div className="flex-shrink-0 w-44 bg-white dark:bg-surface-dark rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 text-center relative">
-              <div className="absolute -top-2 -left-2 w-7 h-7 rounded-full bg-accent flex items-center justify-center text-sm font-bold text-white">1</div>
-              <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-accent/10 flex items-center justify-center">
-                <span className="material-symbols-outlined text-3xl text-accent">photo_camera</span>
+            <div className="flex-shrink-0 w-48 bg-white dark:bg-surface-dark rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 text-center relative">
+              <div className="absolute -top-2 -left-2 w-8 h-8 rounded-full bg-accent flex items-center justify-center text-base font-bold text-white shadow-lg">1</div>
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-accent/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-4xl text-accent">photo_camera</span>
               </div>
-              <h3 className="font-semibold text-base text-primary dark:text-white mb-1">Photographiez</h3>
+              <h3 className="font-semibold text-lg text-primary dark:text-white mb-1">Photographiez</h3>
               <p className="text-sm text-secondary">Capturez l'œuvre</p>
             </div>
-            <div className="flex-shrink-0 w-44 bg-white dark:bg-surface-dark rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 text-center relative">
-              <div className="absolute -top-2 -left-2 w-7 h-7 rounded-full bg-purple-500 flex items-center justify-center text-sm font-bold text-white">2</div>
-              <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                <span className="material-symbols-outlined text-3xl text-purple-500">auto_awesome</span>
+            <div className="flex-shrink-0 w-48 bg-white dark:bg-surface-dark rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 text-center relative">
+              <div className="absolute -top-2 -left-2 w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-base font-bold text-white shadow-lg">2</div>
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                <span className="material-symbols-outlined text-4xl text-purple-500">auto_awesome</span>
               </div>
-              <h3 className="font-semibold text-base text-primary dark:text-white mb-1">Identifiez</h3>
+              <h3 className="font-semibold text-lg text-primary dark:text-white mb-1">Identifiez</h3>
               <p className="text-sm text-secondary">L'IA reconnaît</p>
             </div>
-            <div className="flex-shrink-0 w-44 bg-white dark:bg-surface-dark rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 text-center relative">
-              <div className="absolute -top-2 -left-2 w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-sm font-bold text-white">3</div>
-              <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                <span className="material-symbols-outlined text-3xl text-blue-500">collections</span>
+            <div className="flex-shrink-0 w-48 bg-white dark:bg-surface-dark rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 text-center relative">
+              <div className="absolute -top-2 -left-2 w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-base font-bold text-white shadow-lg">3</div>
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <span className="material-symbols-outlined text-4xl text-blue-500">collections</span>
               </div>
-              <h3 className="font-semibold text-base text-primary dark:text-white mb-1">Collectionnez</h3>
+              <h3 className="font-semibold text-lg text-primary dark:text-white mb-1">Collectionnez</h3>
               <p className="text-sm text-secondary">Votre galerie</p>
             </div>
           </div>
@@ -292,20 +292,20 @@ export default function Home() {
 
           {/* Stats Cards - Horizontal scroll */}
           <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar mb-5">
-            <Link to="/collection" className="flex-shrink-0 bg-white dark:bg-surface-dark rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 min-w-[130px]">
-              <span className="material-symbols-outlined text-3xl text-accent mb-2">collections</span>
-              <p className="text-3xl font-bold text-primary dark:text-white">{stats.total}</p>
-              <p className="text-sm text-secondary">œuvres</p>
+            <Link to="/collection" className="flex-shrink-0 bg-white dark:bg-surface-dark rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 min-w-[140px]">
+              <span className="material-symbols-outlined text-4xl text-accent mb-3">collections</span>
+              <p className="text-4xl font-bold text-primary dark:text-white">{stats.total}</p>
+              <p className="text-base text-secondary">œuvres</p>
             </Link>
-            <div className="flex-shrink-0 bg-white dark:bg-surface-dark rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 min-w-[130px]">
-              <span className="material-symbols-outlined text-3xl text-purple-500 mb-2">palette</span>
-              <p className="text-3xl font-bold text-primary dark:text-white">{stats.artists}</p>
-              <p className="text-sm text-secondary">artistes</p>
+            <div className="flex-shrink-0 bg-white dark:bg-surface-dark rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 min-w-[140px]">
+              <span className="material-symbols-outlined text-4xl text-purple-500 mb-3">palette</span>
+              <p className="text-4xl font-bold text-primary dark:text-white">{stats.artists}</p>
+              <p className="text-base text-secondary">artistes</p>
             </div>
-            <div className="flex-shrink-0 bg-white dark:bg-surface-dark rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 min-w-[130px]">
-              <span className="material-symbols-outlined text-3xl text-blue-500 mb-2">museum</span>
-              <p className="text-3xl font-bold text-primary dark:text-white">{stats.museums}</p>
-              <p className="text-sm text-secondary">musées</p>
+            <div className="flex-shrink-0 bg-white dark:bg-surface-dark rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-800 min-w-[140px]">
+              <span className="material-symbols-outlined text-4xl text-blue-500 mb-3">museum</span>
+              <p className="text-4xl font-bold text-primary dark:text-white">{stats.museums}</p>
+              <p className="text-base text-secondary">musées</p>
             </div>
           </div>
 
