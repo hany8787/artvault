@@ -16,6 +16,7 @@ import ArtworkDetail from './pages/ArtworkDetail'
 import Museums from './pages/Museums'
 import MuseumDetail from './pages/MuseumDetail'
 import News from './pages/News'
+import PublicArtwork from './pages/PublicArtwork'
 
 // Protected Route wrapper
 function ProtectedRoute({ children }) {
@@ -40,6 +41,7 @@ function App() {
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/p/:token" element={<PublicArtwork />} />
 
           {/* Protected routes */}
           <Route path="/" element={

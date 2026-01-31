@@ -32,6 +32,8 @@ export default function ArtworkDetail() {
   const [showCollectionModal, setShowCollectionModal] = useState(false)
   const [generatingAI, setGeneratingAI] = useState(false)
   const [aiProgress, setAiProgress] = useState('')
+  const [makingPublic, setMakingPublic] = useState(false)
+  const [publicLink, setPublicLink] = useState(null)
 
   useEffect(() => {
     fetchArtwork()
@@ -177,6 +179,61 @@ export default function ArtworkDetail() {
       console.error('Share error:', err)
     }
     setShowMenu(false)
+  }
+
+  async function makePublic() {
+    if (makingPublic) return
+    setMakingPublic(true)
+
+    try {
+      // If already has a share token, use it
+      if (artwork.share_token) {
+        const link = `${window.location.origin}/p/${artwork.share_token}`
+        setPublicLink(link)
+        setArtwork(prev => ({ ...prev, is_public: true }))
+
+        // Copy to clipboard
+        await navigator.clipboard.writeText(link)
+        alert('Lien public copié !')
+      } else {
+        // Generate new share token via RPC
+        const { data: token, error } = await supabase.rpc('make_artwork_public', {
+          p_artwork_id: artwork.id,
+          p_user_id: user.id
+        })
+
+        if (error) throw error
+
+        const link = `${window.location.origin}/p/${token}`
+        setPublicLink(link)
+        setArtwork(prev => ({ ...prev, is_public: true, share_token: token }))
+
+        // Copy to clipboard
+        await navigator.clipboard.writeText(link)
+        alert('Lien public créé et copié !')
+      }
+    } catch (err) {
+      console.error('Make public error:', err)
+      alert('Erreur lors du partage. Réessayez.')
+    }
+
+    setMakingPublic(false)
+  }
+
+  async function makePrivate() {
+    try {
+      const { error } = await supabase.rpc('make_artwork_private', {
+        p_artwork_id: artwork.id,
+        p_user_id: user.id
+      })
+
+      if (!error) {
+        setArtwork(prev => ({ ...prev, is_public: false }))
+        setPublicLink(null)
+      }
+    } catch (err) {
+      console.error('Make private error:', err)
+    }
   }
 
   // Check if artwork needs AI description (imported without real description)
@@ -706,6 +763,66 @@ export default function ArtworkDetail() {
       {/* Share Section */}
       <section className="max-w-6xl mx-auto px-4 py-8 border-t border-primary/10">
         <h2 className="label mb-4 text-center">Partager cette œuvre</h2>
+
+        {/* Public Link Status */}
+        {artwork.is_public && artwork.share_token && (
+          <div className="max-w-md mx-auto mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="material-symbols-outlined text-green-500">public</span>
+              <span className="text-green-500 font-medium">Lien public actif</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={`${window.location.origin}/p/${artwork.share_token}`}
+                readOnly
+                className="flex-1 input text-xs"
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/p/${artwork.share_token}`)
+                  alert('Lien copié !')
+                }}
+                className="btn btn-ghost btn-icon"
+              >
+                <span className="material-symbols-outlined">content_copy</span>
+              </button>
+            </div>
+            <button
+              onClick={makePrivate}
+              className="mt-2 text-xs text-red-400 hover:text-red-300"
+            >
+              Rendre privé
+            </button>
+          </div>
+        )}
+
+        {/* Make Public Button */}
+        {!artwork.is_public && (
+          <div className="max-w-md mx-auto mb-6 text-center">
+            <button
+              onClick={makePublic}
+              disabled={makingPublic}
+              className="btn btn-primary gap-2"
+            >
+              {makingPublic ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Création du lien...
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined">public</span>
+                  Créer un lien public
+                </>
+              )}
+            </button>
+            <p className="text-xs text-secondary mt-2">
+              Partagez cette œuvre avec n'importe qui via un lien unique
+            </p>
+          </div>
+        )}
+
         <div className="flex justify-center gap-3">
           {/* Native Share (mobile) */}
           {typeof navigator !== 'undefined' && navigator.share && (
