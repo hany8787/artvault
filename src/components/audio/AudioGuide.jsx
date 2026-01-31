@@ -1,10 +1,12 @@
 /**
  * Composant Audio Guide - Lecteur style musée
  * Design premium avec carte dépliable
+ * Uses Edge TTS (Microsoft Neural Voices) with Web Speech API fallback
  */
 
 import { useState, useEffect, useRef } from 'react';
 import { useSpeech } from '../../hooks/useSpeech';
+import { useEdgeTTS } from '../../hooks/useEdgeTTS';
 import { generateAudioText, AUDIO_LEVELS } from '../../services/audioGuide';
 
 /**
@@ -17,18 +19,29 @@ export function AudioGuidePlayer({ artwork, className = '' }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showText, setShowText] = useState(false);
+  const [useEdge, setUseEdge] = useState(true); // Prefer Edge TTS
 
+  // Edge TTS (high quality neural voices)
+  const edgeTTS = useEdgeTTS();
+
+  // Web Speech API (fallback)
+  const webSpeech = useSpeech();
+
+  // Use Edge TTS if available, fallback to Web Speech
+  const tts = useEdge ? edgeTTS : webSpeech;
   const {
-    isSupported,
     isSpeaking,
     isPaused,
     progress,
-    currentCharIndex,
-    speak,
+    speak: ttsSpeak,
     pause,
     resume,
     stop
-  } = useSpeech();
+  } = tts;
+
+  // Current char index only available in Web Speech API
+  const currentCharIndex = webSpeech.currentCharIndex;
+  const isSupported = webSpeech.isSupported || true; // Edge TTS always supported
 
   const textContainerRef = useRef(null);
   const highlightRef = useRef(null);
@@ -79,7 +92,18 @@ export function AudioGuidePlayer({ artwork, className = '' }) {
         text = await loadAudioText(selectedLevel);
       }
       if (text) {
-        speak(text, selectedLevel);
+        try {
+          // Try Edge TTS first
+          if (useEdge) {
+            await ttsSpeak(text, { level: selectedLevel });
+          } else {
+            ttsSpeak(text, selectedLevel);
+          }
+        } catch (err) {
+          console.error('Edge TTS failed, falling back to Web Speech:', err);
+          setUseEdge(false);
+          webSpeech.speak(text, selectedLevel);
+        }
       }
     }
   }
@@ -154,6 +178,15 @@ export function AudioGuidePlayer({ artwork, className = '' }) {
             <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-accent/10 border border-accent/20">
               <span className="material-symbols-outlined text-accent text-sm">auto_awesome</span>
               <span className="text-xs text-accent font-medium">IA</span>
+            </div>
+            {/* Voice quality badge */}
+            <div className={`flex items-center gap-1 px-2 py-1 rounded-full border ${useEdge ? 'bg-purple-500/10 border-purple-500/20' : 'bg-blue-500/10 border-blue-500/20'}`}>
+              <span className={`material-symbols-outlined text-sm ${useEdge ? 'text-purple-400' : 'text-blue-400'}`}>
+                {useEdge ? 'graphic_eq' : 'volume_up'}
+              </span>
+              <span className={`text-xs font-medium ${useEdge ? 'text-purple-400' : 'text-blue-400'}`}>
+                {useEdge ? 'HD' : 'Web'}
+              </span>
             </div>
             <span className="material-symbols-outlined text-white/40">expand_less</span>
           </div>
@@ -252,10 +285,12 @@ export function AudioGuidePlayer({ artwork, className = '' }) {
 
           {/* Statut */}
           <p className="text-center text-sm text-white/40 mt-3">
-            {isLoading && 'Génération en cours...'}
-            {isSpeaking && !isPaused && 'Lecture en cours'}
+            {(isLoading || edgeTTS.isLoading) && 'Génération en cours...'}
+            {isSpeaking && !isPaused && (useEdge ? 'Lecture HD en cours' : 'Lecture en cours')}
             {isPaused && 'En pause'}
-            {!isLoading && !isSpeaking && !isPaused && 'Appuyez pour écouter'}
+            {!isLoading && !edgeTTS.isLoading && !isSpeaking && !isPaused && (
+              useEdge ? 'Voix neurale Microsoft Edge' : 'Voix système'
+            )}
           </p>
         </div>
 
