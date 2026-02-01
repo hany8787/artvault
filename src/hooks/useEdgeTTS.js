@@ -1,6 +1,7 @@
 /**
  * Hook for Edge TTS (Microsoft Neural Voices)
  * High-quality text-to-speech using Microsoft Edge voices
+ * Falls back to Web Speech API if server-side TTS is unavailable
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
@@ -15,9 +16,11 @@ export function useEdgeTTS() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState(null);
   const [duration, setDuration] = useState(0);
+  const [usingFallback, setUsingFallback] = useState(false);
 
   const audioRef = useRef(null);
   const progressIntervalRef = useRef(null);
+  const utteranceRef = useRef(null);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -29,7 +32,72 @@ export function useEdgeTTS() {
       if (progressIntervalRef.current) {
         clearInterval(progressIntervalRef.current);
       }
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
     };
+  }, []);
+
+  /**
+   * Fallback: Use Web Speech API
+   */
+  const speakWithWebSpeech = useCallback((text, options = {}) => {
+    return new Promise((resolve, reject) => {
+      if (!window.speechSynthesis) {
+        reject(new Error('Web Speech API not supported'));
+        return;
+      }
+
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utteranceRef.current = utterance;
+
+      // Configure voice based on level
+      const { level = 'amateur' } = options;
+      utterance.lang = 'fr-FR';
+      utterance.rate = level === 'enfant' ? 0.85 : level === 'expert' ? 1.0 : 0.95;
+      utterance.pitch = level === 'enfant' ? 1.1 : level === 'expert' ? 0.95 : 1.0;
+
+      // Try to get a French voice
+      const voices = window.speechSynthesis.getVoices();
+      const frenchVoice = voices.find(v => v.lang.startsWith('fr'));
+      if (frenchVoice) {
+        utterance.voice = frenchVoice;
+      }
+
+      utterance.onstart = () => {
+        setIsPlaying(true);
+        setIsPaused(false);
+        setProgress(0);
+        setUsingFallback(true);
+      };
+
+      utterance.onend = () => {
+        setIsPlaying(false);
+        setIsPaused(false);
+        setProgress(100);
+        resolve();
+      };
+
+      utterance.onerror = (e) => {
+        console.error('Web Speech error:', e);
+        setError(e.error);
+        reject(e);
+      };
+
+      // Estimate progress based on character position
+      let charIndex = 0;
+      utterance.onboundary = (e) => {
+        if (e.name === 'word') {
+          charIndex = e.charIndex;
+          setProgress(Math.round((charIndex / text.length) * 100));
+        }
+      };
+
+      window.speechSynthesis.speak(utterance);
+    });
   }, []);
 
   /**
@@ -46,6 +114,7 @@ export function useEdgeTTS() {
 
     setIsLoading(true);
     setError(null);
+    setUsingFallback(false);
 
     try {
       const response = await fetch(
@@ -64,7 +133,20 @@ export function useEdgeTTS() {
         throw new Error('Failed to generate audio');
       }
 
-      const { audio, format, duration_estimate } = await response.json();
+      const data = await response.json();
+
+      // Check if server returned fallback signal
+      if (data.fallback) {
+        console.log('Edge TTS unavailable, using Web Speech API fallback');
+        setUsingFallback(true);
+        return { fallback: true, text };
+      }
+
+      const { audio, format, duration_estimate } = data;
+
+      if (!audio) {
+        throw new Error('No audio data received');
+      }
 
       // Convert base64 to audio blob
       const binaryString = atob(audio);
@@ -72,24 +154,27 @@ export function useEdgeTTS() {
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
-      const audioBlob = new Blob([bytes], { type: format });
+      const audioBlob = new Blob([bytes], { type: format || 'audio/mpeg' });
       const audioUrl = URL.createObjectURL(audioBlob);
 
       // Cache the result
-      audioCache.set(cacheKey, { audioUrl, duration_estimate });
+      const result = { audioUrl, duration_estimate };
+      audioCache.set(cacheKey, result);
 
-      return { audioUrl, duration_estimate };
+      return result;
     } catch (err) {
       console.error('Edge TTS error:', err);
       setError(err.message);
-      return null;
+      // Return fallback signal on error
+      setUsingFallback(true);
+      return { fallback: true, text };
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   /**
-   * Speak text using Edge TTS
+   * Speak text using Edge TTS (with fallback to Web Speech)
    */
   const speak = useCallback(async (text, options = {}) => {
     // Stop any current playback
@@ -97,6 +182,17 @@ export function useEdgeTTS() {
 
     const result = await generateAudio(text, options);
     if (!result) return;
+
+    // If fallback, use Web Speech API
+    if (result.fallback) {
+      try {
+        await speakWithWebSpeech(text, options);
+      } catch (e) {
+        console.error('Both TTS methods failed:', e);
+        setError('Audio playback unavailable');
+      }
+      return;
+    }
 
     const { audioUrl, duration_estimate } = result;
 
@@ -144,32 +240,44 @@ export function useEdgeTTS() {
       console.error('Failed to play audio:', err);
       setError('Could not play audio');
     }
-  }, [generateAudio]);
+  }, [generateAudio, speakWithWebSpeech]);
 
   /**
    * Pause playback
    */
   const pause = useCallback(() => {
-    if (audioRef.current && isPlaying) {
+    if (usingFallback && window.speechSynthesis) {
+      window.speechSynthesis.pause();
+      setIsPaused(true);
+    } else if (audioRef.current && isPlaying) {
       audioRef.current.pause();
       setIsPaused(true);
     }
-  }, [isPlaying]);
+  }, [isPlaying, usingFallback]);
 
   /**
    * Resume playback
    */
   const resume = useCallback(() => {
-    if (audioRef.current && isPaused) {
+    if (usingFallback && window.speechSynthesis) {
+      window.speechSynthesis.resume();
+      setIsPaused(false);
+    } else if (audioRef.current && isPaused) {
       audioRef.current.play();
       setIsPaused(false);
     }
-  }, [isPaused]);
+  }, [isPaused, usingFallback]);
 
   /**
    * Stop playback
    */
   const stop = useCallback(() => {
+    // Stop Web Speech
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    
+    // Stop Audio element
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
@@ -197,14 +305,14 @@ export function useEdgeTTS() {
   }, [isPlaying, isPaused, pause, resume, speak]);
 
   /**
-   * Seek to position (0-100)
+   * Seek to position (0-100) - only works with Audio element, not Web Speech
    */
   const seek = useCallback((percentage) => {
-    if (audioRef.current && audioRef.current.duration) {
+    if (audioRef.current && audioRef.current.duration && !usingFallback) {
       audioRef.current.currentTime = (percentage / 100) * audioRef.current.duration;
       setProgress(percentage);
     }
-  }, []);
+  }, [usingFallback]);
 
   /**
    * Clear the audio cache
@@ -212,7 +320,7 @@ export function useEdgeTTS() {
   const clearCache = useCallback(() => {
     // Revoke object URLs to free memory
     audioCache.forEach(({ audioUrl }) => {
-      URL.revokeObjectURL(audioUrl);
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
     });
     audioCache.clear();
   }, []);
@@ -226,6 +334,7 @@ export function useEdgeTTS() {
     progress,
     duration,
     error,
+    usingFallback,
 
     // Actions
     speak,
